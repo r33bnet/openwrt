@@ -198,7 +198,8 @@ sysupgrade -n /tmp/openwrt-qualcommbe-ipq53xx-cudy_wr11000-squashfs-sysupgrade.b
 `platform.sh` first deletes the stock `ubi_rootfs` volume — otherwise the
 52 MiB UBI is too full for `rootfs_data` — then runs the usual
 `nand_do_upgrade` on `rootfs`. The other slot (`rootfs_1`) still holds stock
-firmware.
+firmware. If the UBI on `rootfs` will not attach at all, `platform.sh` skips
+that step and `nand_do_upgrade` reformats the partition.
 
 **Back to stock:** only `rootfs` was changed, so write your `rootfs.bin`
 backup back to it. TFTP-boot the initramfs first (the NAND system runs from
@@ -206,13 +207,35 @@ backup back to it. TFTP-boot the initramfs first (the NAND system runs from
 52 MiB and `/tmp` is RAM. From the PC, next to the `wr11000-backup` folder:
 
 ```sh
-ssh root@192.168.1.1 "mtd write - rootfs" < wr11000-backup/rootfs.bin
-ssh root@192.168.1.1 "md5sum /dev/mtd19"     # must equal: md5sum wr11000-backup/rootfs.bin
+ssh root@192.168.1.1 "ubiformat /dev/mtd19 -y -S $(wc -c < wr11000-backup/rootfs.bin) -f -" \
+	< wr11000-backup/rootfs.bin
 ```
 
+Use `ubiformat`, **never** `mtd write` or `dd`, for anything holding UBI.
+Those program the dump's empty 0xFF pages as well; the pages then look
+erased but carry ECC, and the first time UBI or UBIFS writes into one it is
+programmed twice and fails ECC. On 2026-11-17 this broke both copies of the
+UBI volume table after one run of stock firmware: stock U-Boot (`UBI init
+error 22`), stock firmware and OpenWrt all failed to attach `rootfs`. See
+`01_bootlog.txt`. `ubiformat` erases each block and skips the empty pages at
+its end. It also rewrites the EC headers, so an md5 of the partition no
+longer matches the backup.
+
 `wr11000-restore-stock.sh` / `.ps1` do the same with checks (RAM boot,
-partition size, md5 after writing). On Windows PowerShell use the `.ps1`:
+UBI header, partition size, then a clean `ubiattach` with no ECC errors and
+the `ubi_rootfs` volume present). On Windows PowerShell use the `.ps1`:
 `<` and `>` there corrupt binary data. Then power-cycle.
+
+**`rootfs` does not attach** (ECC errors on the volume table, `UBI init
+error 22` in U-Boot): TFTP-boot the initramfs, then either reformat the slot
+and install OpenWrt -
+
+```sh
+ubiformat /dev/mtd19 -y      # mtd19 must be "rootfs" in /proc/mtd
+sysupgrade -n /tmp/openwrt-qualcommbe-ipq53xx-cudy_wr11000-squashfs-sysupgrade.bin
+```
+
+\- or run the restore script above to go back to stock.
 
 ## Status
 
@@ -220,14 +243,15 @@ Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
 
 | Subsystem | State |
 |---|---|
-| Build, TFTP initramfs boot | working (initramfs must be zstd, U-Boot unpacks ≤ 64 MiB) |
-| NAND sysupgrade and boot from NAND | working |
+| Build, TFTP initramfs boot | working (initramfs must be zstd, U-Boot unpacks ≤ 64 MiB). `configs/cudy-wr11000-initramfs.config` builds a minimal xz one without Wi-Fi (LAN, DHCP, SSH, LuCI flash page) - booted and used to sysupgrade on 2026-11-17 |
+| NAND sysupgrade and boot from NAND | working; on 2026-11-17 also from a `rootfs` slot that had been `ubiformat`-ed after a bad restore (`01_bootlog.txt`) |
+| ath12k regulatory at boot | both chips log `No reg rules available` and a WARN at `wmi.c:7097` ~23 s in, before the radios are configured; all three radios then come up with country US. New on this base, looks cosmetic |
 | QCA8386 / DSA: WAN + 3 LAN at 1 Gbit/s, 2.5G CPU link | working, including cold boots from NAND (patches 0463, 0465, 0466) |
 | Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US) |
 | Wi-Fi MACs from bdinfo | working, same as stock |
 | MLO client (STA) | associates, then floods fw-stats errors (open item 9) |
 | LEDs / buttons | not checked |
-| Return to stock | procedure above, not yet run |
+| Return to stock | the old `mtd write` restore booted stock once, then corrupted the UBI (see Install). The `ubiformat` procedure above has not been run yet |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 
 ## Files added or changed for this device
