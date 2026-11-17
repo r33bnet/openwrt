@@ -14,11 +14,18 @@ remove_oem_ubi_rootfs() {
 
 	ubidev=$(nand_find_ubi "$CI_UBIPART")
 	if [ -z "$ubidev" ]; then
-		ubiattach --mtdn="$mtdnum" || return 1
+		# A UBI that will not attach (e.g. both volume tables fail
+		# ECC) has no ubi_rootfs to remove. Do not abort here:
+		# nand_do_upgrade ubiformats an unattachable partition and
+		# carries on, but only if it gets to run.
+		ubiattach --mtdn="$mtdnum" || {
+			echo "Cannot attach $CI_UBIPART, leaving it to nand_do_upgrade"
+			return 0
+		}
 		ubidev=$(nand_find_ubi "$CI_UBIPART")
 	fi
 
-	[ -n "$ubidev" ] || return 1
+	[ -n "$ubidev" ] || return 0
 
 	ubivol=$(nand_find_volume "$ubidev" ubi_rootfs)
 	[ -z "$ubivol" ] || {
