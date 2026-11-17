@@ -239,19 +239,21 @@ sysupgrade -n /tmp/openwrt-qualcommbe-ipq53xx-cudy_wr11000-squashfs-sysupgrade.b
 
 ## Status
 
-Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
+Tested on hardware (2026-11-16, unit with stock firmware v2.5.234; the
+restore-and-reinstall cycle was re-run on 2026-11-17 at r38482,
+`02_bootlog.txt`):
 
 | Subsystem | State |
 |---|---|
 | Build, TFTP initramfs boot | working (initramfs must be zstd, U-Boot unpacks ≤ 64 MiB). `configs/cudy-wr11000-initramfs.config` builds a minimal xz one without Wi-Fi (LAN, DHCP, SSH, LuCI flash page) - booted and used to sysupgrade on 2026-11-17 |
-| NAND sysupgrade and boot from NAND | working; on 2026-11-17 also from a `rootfs` slot that had been `ubiformat`-ed after a bad restore (`01_bootlog.txt`) |
+| NAND sysupgrade and boot from NAND | working: from stock, removing `ubi_rootfs` (`02_bootlog.txt`), and from a `rootfs` slot that had been `ubiformat`-ed after a bad restore (`01_bootlog.txt`). The `platform.sh` fallback for a slot that will not attach has not been exercised yet |
 | ath12k regulatory at boot | both chips log `No reg rules available` and a WARN at `wmi.c:7097` ~23 s in, before the radios are configured; all three radios then come up with country US. New on this base, looks cosmetic |
 | QCA8386 / DSA: WAN + 3 LAN at 1 Gbit/s, 2.5G CPU link | working, including cold boots from NAND (patches 0463, 0465, 0466) |
 | Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US) |
 | Wi-Fi MACs from bdinfo | working, same as stock |
 | MLO client (STA) | associates, then floods fw-stats errors (open item 9) |
 | LEDs / buttons | not checked |
-| Return to stock | the old `mtd write` restore booted stock once, then corrupted the UBI (see Install). The `ubiformat` procedure above has not been run yet |
+| Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay (`02_bootlog.txt`, `ps_output_log.txt`). The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 
 ## Files added or changed for this device

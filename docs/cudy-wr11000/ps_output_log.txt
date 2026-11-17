@@ -1,0 +1,12 @@
+PS C:\temp> .\wr11000-restore-stock.ps1
+Backup image: wr11000-backup\rootfs.bin (54657024 bytes)
+Target: /dev/mtd19 (54657024 bytes)
+Writing - this takes a few minutes...
+ubiformat: mtd19 (nand), size 54657024 bytes (52.1 MiB), 417 eraseblocks of 131072 bytes (128.0 KiB), min. I/O size 2048 bytes
+libscan: scanning eraseblock 416 -- 100 % complete
+ubiformat: 417 eraseblocks have valid erase counter, mean value is 17
+ubiformat: flashing eraseblock 416 -- 100 % complete
+
+Volumes: kernel ubi_rootfs rootfs_data
+VERIFIED: /dev/mtd19 attaches cleanly with the stock volumes. Power-cycle the router to boot stock.
+PS C:\temp>
