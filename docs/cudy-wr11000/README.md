@@ -286,6 +286,8 @@ Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
    `failed to pull fw stats: -71` and `No VIF found for vdev 1`. The fw
    stats requests come from station statistics polls (LuCI status page,
    `iwinfo`). Not investigated; AP mode is the target.
+   Not seen on the 6.18.60 / backports 7.2 base: 31 min as an MLO client
+   with 0 "fw stats" or "VIF" messages (2026-11-16). Reopen if it returns.
 10. **NAND boot: switch reference clock (patches 0465, 0466).** The QCA8386
     XO is the UNIPHY0 50 MHz clock-out (0x7a00610 bit 0): clearing it at
     runtime stops all switch traffic, setting it again retrains every PHY
