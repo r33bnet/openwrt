@@ -268,7 +268,7 @@
 		"disassoc_low_ack": {
 			"description": "Disassociate stations based on excessive transmission failures or other indications of connection loss. This depends on the driver capabilities and may not be available with all drivers.",
 			"type": "boolean",
-			"default": true
+			"default": false
 		},
 		"dpp": {
 			"description": "Enable the DPP AKM in addition to the one selected by encryption. Sets ieee80211w to 1 (optional) if it is 0 or not set, also an explicit 0 and sae-compat outside 6 GHz, whose base RSNE then advertises PMF",
