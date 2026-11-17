@@ -296,6 +296,12 @@ Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
     QCA8386 clock controller uses `<&pcs0 2>` as XO, so it probes after
     pcs0 and enables the pin with the UNIPHY clocks already on. 0465 waits
     100 ms after the QCA8386 reset. Untested.
+11. **NAND writes on Linux 6.18.60 (patch 0467).** Pages written by 6.18.60
+    were partly unreadable: ECC errors in UBI, and stock U-Boot could not read
+    the kernel volume (log 14). 0467 restores the 6.18.39 spi-qpic-snand
+    register sequence by reverting the two stable commits in between
+    (930a7312c946 ECC_BUF_CFG, 8fd62901d6bf SET_FEATURE ordering). Which one
+    is responsible is not known yet; dropping one at a time would tell.
 
 ## Files added or changed for this device
 
