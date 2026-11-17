@@ -1,18 +1,3 @@
-# OpenWrt for the GL.iNet Flint 3 (GL-BE9300)
-
-<a href="https://ko-fi.com/C8Y320ZTT2"><img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" height="36" alt="Buy Me a Coffee at ko-fi.com"></a>
-
-Mainline **OpenWrt** support for the **GL.iNet Flint 3 (GL-BE9300)** — Qualcomm
-**IPQ5332** (quad Cortex-A53) with tri-band Wi-Fi 7, a Realtek **RTL8372N** 10G
-switch and a **RTL8221B** 2.5G WAN PHY.
-
-> **This branch (`flint3-be9300`) is a complete, buildable OpenWrt tree.**
-> Clone it and build — there is nothing to drop into another checkout.
-> (An earlier `main` branch held a target *overlay*; it is retired and
-> preserved at the tag `archive/main-overlay`.)
-
-Target: **`qualcommbe/ipq53xx`**, kernel **6.18**.
-
 > [!NOTE]
 > Branch `cudy-wr11000` adds an untested bring-up port of the **Cudy WR11000**
 > (IPQ5322, SPI-NAND, QCA8386 switch). See
