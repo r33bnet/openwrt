@@ -1,0 +1,150 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] net: pcs: qcom-ipq9574: provide the UNIPHY 50 MHz clock-out as a clock
+
+The UNIPHY CLKOUT_50M_CTRL register drives a 50/25 MHz clock-out pin. On
+the Cudy WR11000 that pin is the reference clock of the QCA8386 switch:
+clearing bit 0 at runtime stops all switch traffic and setting it again
+makes every PHY retrain. The vendor U-Boot enables it only when it brings
+up its own network (TFTP), so a flash boot leaves the switch dead.
+
+Enabling it early from the MDIO driver is not safe: before this driver
+has its UNIPHY clocks running, the access ends in a NoC error and the SoC
+resets. So expose the pin as a third clock of this provider (index 2,
+after PCS_RX_CLK and PCS_TX_CLK), a 50 MHz gate. A consumer that takes it
+- the QCA8386 clock controller, as its XO - is probed only after this
+driver, and enabling it sets the bit with the UNIPHY clocks already on.
+
+The UNIPHY resets pulsed in ipq_pcs_config_mode() could drop the pin, so
+it is restored there while enabled.
+
+---
+--- a/drivers/net/pcs/pcs-qcom-ipq9574.c
++++ b/drivers/net/pcs/pcs-qcom-ipq9574.c
+@@ -28,6 +28,9 @@
+ #define PCS_CLKOUT_50M_25M_EN		BIT(0)
+ #define PCS_CLKOUT_50M_DIV2_SEL		BIT(5)
+ 
++/* Clock index of the 50 MHz clock-out pin (after PCS_RX_CLK/PCS_TX_CLK) */
++#define PCS_CLKOUT_50M_CLK		2
++
+ #define PCS_MISC2			0x218
+ #define PCS_MISC2_RATE_MASK		GENMASK(1, 0)
+ #define PCS_MISC2_MODE_MASK		GENMASK(6, 4)
+@@ -162,6 +165,9 @@
+ 	struct clk_hw rx_hw;
+ 	/* TX clock supplied to NSSCC */
+ 	struct clk_hw tx_hw;
++	/* 50 MHz clock-out pin, e.g. the reference of an external switch */
++	struct clk_hw clkout_hw;
++	bool clkout_on;
+ 
+ 	struct ipq_pcs_mii *qpcs_mii[PCS_MAX_MII_NRS];
+ 	struct reset_control *xpcs_rstc;
+@@ -464,6 +470,18 @@
+ 
+ 	qpcs->interface = interface;
+ 
++	/* The UNIPHY resets above can drop the clock-out; anything
++	 * clocked from it (an external switch) must not lose it.
++	 */
++	if (qpcs->clkout_on) {
++		ret = regmap_update_bits(qpcs->regmap, PCS_CLKOUT_50M_CTRL,
++					 PCS_CLKOUT_50M_25M_EN |
++					 PCS_CLKOUT_50M_DIV2_SEL,
++					 PCS_CLKOUT_50M_25M_EN);
++		if (ret)
++			return ret;
++	}
++
+ 	/* The clock output register is only writable after PLL reset
+ 	 * and calibration, so this cannot be done at probe.
+ 	 */
+@@ -1086,6 +1104,61 @@
+ 	.recalc_rate = ipq_pcs_tx_clk_recalc_rate,
+ };
+ 
++static int ipq_pcs_clkout_enable(struct clk_hw *hw)
++{
++	struct ipq_pcs *qpcs = container_of(hw, struct ipq_pcs, clkout_hw);
++	unsigned int val;
++	int ret;
++
++	/* 50 MHz: enable, divide-by-two off */
++	ret = regmap_update_bits(qpcs->regmap, PCS_CLKOUT_50M_CTRL,
++				 PCS_CLKOUT_50M_25M_EN | PCS_CLKOUT_50M_DIV2_SEL,
++				 PCS_CLKOUT_50M_25M_EN);
++	if (ret)
++		return ret;
++
++	ret = regmap_read(qpcs->regmap, PCS_CLKOUT_50M_CTRL, &val);
++	if (!ret && !(val & PCS_CLKOUT_50M_25M_EN))
++		dev_warn(qpcs->dev, "50 MHz clock-out did not enable (0x%x)\n", val);
++
++	qpcs->clkout_on = true;
++	return 0;
++}
++
++static void ipq_pcs_clkout_disable(struct clk_hw *hw)
++{
++	struct ipq_pcs *qpcs = container_of(hw, struct ipq_pcs, clkout_hw);
++
++	qpcs->clkout_on = false;
++	regmap_clear_bits(qpcs->regmap, PCS_CLKOUT_50M_CTRL,
++			  PCS_CLKOUT_50M_25M_EN);
++}
++
++static int ipq_pcs_clkout_is_enabled(struct clk_hw *hw)
++{
++	struct ipq_pcs *qpcs = container_of(hw, struct ipq_pcs, clkout_hw);
++	unsigned int val;
++
++	if (regmap_read(qpcs->regmap, PCS_CLKOUT_50M_CTRL, &val))
++		return 0;
++
++	return !!(val & PCS_CLKOUT_50M_25M_EN);
++}
++
++static unsigned long ipq_pcs_clkout_recalc_rate(struct clk_hw *hw,
++					       unsigned long parent_rate)
++{
++	return 50000000;
++}
++
++/* Clock ops for the 50 MHz clock-out pin */
++static const struct clk_ops ipq_pcs_clkout_ops = {
++	.enable = ipq_pcs_clkout_enable,
++	.disable = ipq_pcs_clkout_disable,
++	.is_enabled = ipq_pcs_clkout_is_enabled,
++	.recalc_rate = ipq_pcs_clkout_recalc_rate,
++};
++
+ static struct clk_hw *ipq_pcs_clk_hw_get(struct of_phandle_args *clkspec,
+ 					 void *data)
+ {
+@@ -1096,6 +1169,8 @@
+ 		return &qpcs->rx_hw;
+ 	case PCS_TX_CLK:
+ 		return &qpcs->tx_hw;
++	case PCS_CLKOUT_50M_CLK:
++		return &qpcs->clkout_hw;
+ 	}
+ 
+ 	return ERR_PTR(-EINVAL);
+@@ -1134,6 +1209,17 @@
+ 	if (ret)
+ 		return ret;
+ 
++	init.ops = &ipq_pcs_clkout_ops;
++	init.name = devm_kasprintf(qpcs->dev, GFP_KERNEL, "%s::clkout_50m",
++				   dev_name(qpcs->dev));
++	if (!init.name)
++		return -ENOMEM;
++
++	qpcs->clkout_hw.init = &init;
++	ret = devm_clk_hw_register(qpcs->dev, &qpcs->clkout_hw);
++	if (ret)
++		return ret;
++
+ 	return devm_of_clk_add_hw_provider(qpcs->dev, ipq_pcs_clk_hw_get, qpcs);
+ }
+ 

@@ -1,0 +1,259 @@
+Format: Log Type - Time(microsec) - Message - Optional Info
+Log Type: B - Since Boot(Power On Reset),  D - Delta,  S - Statistic
+S - QC_IMAGE_VERSION_STRING=BOOT.XF.0.3.1.1-00086-IPQ90xxLZB-2
+S - IMAGE_VARIANT_STRING=IPQ5332LA
+S - OEM_IMAGE_VERSION_STRING=crm-ubuntu142
+S - Boot Interface: NAND
+S - Secure Boot: Off
+S - Boot Config @ 0x000a602c = 0x000002c5
+S - JTAG ID @ 0x000a607c = 0x1023d0e1
+S - OEM ID @ 0x000a6080 = 0x00000000
+S - Serial Number @ 0x000a60a8 = 0xXXXXXXXX
+S - OEM Config Row 0 @ 0x000a4058 = 0x0000000000000000
+S - OEM Config Row 1 @ 0x000a4060 = 0x0000000000000000
+S - Feature Config Row 0 @ 0x000a4018 = 0x0000800004000001
+S - Feature Config Row 1 @ 0x000a4020 = 0x0000000000000000
+S - Feature Config Row 2 @ 0x000a4028 = 0x0000000000000000
+S - FM_VERSION @ 0x000a4004 = 0x00000005
+S - TAG_VERSION @ 0x000a4004 = 0x00000000
+S - FEATURE ID @ 0x000a4000 = 0x00000000
+S - PBL Patch Ver: 1
+S - TME-L LCS: 0x0b
+S - I-cache: Off
+S - D-cache: Off
+B -      3413 - PBL, Start
+B -       959 - bootable_media_detect_entry, Start
+B -      2473 - bootable_media_detect_success, Start
+B -      4509 - elf_loader_entry, Start
+B -      4512 - auth_hash_seg_entry, Start
+B -      9856 - auth_hash_seg_exit, Start
+B -     10497 - elf_segs_hash_verify_entry, Start
+B -    215543 - elf_segs_hash_verify_exit, Start
+B -    282883 - auth_xbl_sec_hash_seg_entry, Start
+B -    282945 - auth_xbl_sec_hash_seg_exit, Start
+B -    305062 - xbl_sec_segs_hash_verify_entry, Start
+B -    305064 - xbl_sec_segs_hash_verify_exit, Start
+B -    324470 - PBL, End
+B -    280264 - SBL1, Start
+B -   1083482 - GCC [RstStat:0x10, RstDbg:0x600000] WDog Stat : 0x4
+B -   1086227 - System Reset Reason : Power on Reset [0x20]
+B -   1091808 - clock_init, Start
+D -       579 - clock_init, Delta
+B -   1099769 - boot_flash_init, Start
+D -     24247 - boot_flash_init, Delta
+B -   1127066 - sbl1_ddr_set_default_params, Start
+D -        61 - sbl1_ddr_set_default_params, Delta
+B -   1133685 - boot_config_data_table_init, Start
+D -      3751 - boot_config_data_table_init, Delta - (615 Bytes)
+B -   1142560 - CDT Version:2,Platform ID:8,Major ID:6,Minor ID:0,Subtype:0
+B -   1148264 - Image Load, Start
+D -      6618 - OEM_MISC Image Loaded, Delta - (0 Bytes)
+B -   1157658 - Image Load, Start
+D -      5002 - PMIC Image Loaded, Delta - (0 Bytes)
+B -   1165527 - sbl1_ddr_set_params, Start
+B -   1170285 - CPR configuration: 0x3a7
+B -   1173731 - Pre_DDR_clock_init, Start
+D -         0 - Pre_DDR_clock_init, Delta
+D -         0 - sbl1_ddr_set_params, Delta
+B -   1246138 - Image Load, Start
+D -       122 - APDP Image Loaded, Delta - (0 Bytes)
+B -   1252147 - Image Load, Start
+D -     34587 - TME-L FW Image Loaded, Delta - (49592 Bytes)
+B -   1286917 - Image Load, Start
+D -      2104 - Auth Metadata
+D -      4606 - Segments hash check
+D -     24004 - QSEE Dev Config Image Loaded, Delta - (35096 Bytes)
+B -   1313025 - Image Load, Start
+D -    126575 - Auth Metadata
+D -    198189 - Segments hash check
+D -    690123 - QSEE Image Loaded, Delta - (1466408 Bytes)
+B -   2003789 - Image Load, Start
+D -      2135 - Auth Metadata
+D -     50874 - Segments hash check
+D -    152561 - APPSBL Image Loaded, Delta - (378768 Bytes)
+B -   2160223 - SBL1, End
+D -   1883040 - SBL1, Delta
+S - Flash Throughput, 4015 KB/s  (1931151 Bytes,  480888 us)
+S - Core 0 Frequency, 800 MHz
+S - DDR Frequency, 1200 MHz
+
+
+U-Boot 2016.01 (Dec 12 2024 - 10:00:38 +0000), Build: jenkins-WR11000-24
+
+DRAM:  smem ram ptable found: ver: 2 len: 4
+512 MiB
+NAND:  QPIC controller support serial NAND
+ID = 81c881c8
+Vendor = c8
+Device = 81
+Serial Nand Device Found With ID : 0xc8 0x81
+Serial NAND device Manufacturer:GD5F1GM7REYIG
+Device Size:128 MiB, Page size:2048, Spare Size:128, ECC:8-bit
+qpic_nand: changing oobsize to 80 from 128 bytes
+SF: Unsupported flash IDs: manuf 00, jedec 0000, ext_jedec 0000
+ipq_spi: SPI Flash not found (bus/cs/speed/mode) = (0/0/48000000/0)
+128 MiB
+*** Warning - bad CRC, using default environment
+
+PCI0 is not defined in the device tree
+PCI Link Intialized
+PCI2 is not defined in the device tree
+In:    serial@78AF000
+Out:   serial@78AF000
+Err:   serial@78AF000
+machid: 8060000
+eth0 MAC Address from ART is not valid
+eth1 MAC Address from ART is not valid
+input <abort key> to stop autoboot in  1s
+
+Net:   MAC0 addr:0:3:7f:ba:db:ad
+EDMA ver 1 hw init
+Num rings - TxDesc:1 (23-23) TxCmpl:1 (23-23)
+RxDesc:1 (15-15) RxFill:1 (7-7)
+ipq5332_edma_alloc_rings: successfull
+ipq5332_edma_setup_ring_resources: successfull
+ipq5332_edma_configure_rings: successfull
+ipq5332_edma_hw_init: successfull
+eth0
+IPQ5332# help
+?       - alias for 'help'
+base    - print or set address offset
+bdinfo  - print Board Info structure
+bootelf - Boot from an ELF image in memory
+bootipq - bootipq from flash device
+bootm   - boot application image from memory
+bootp   - boot image via network using BOOTP/TFTP protocol
+bootvx  - Boot vxWorks from an ELF image
+bootz   - boot Linux zImage image from memory
+canary  - test stack canary
+chpart  - change active partition
+cmp     - memory compare
+coninfo - print console devices and information
+cp      - memory copy
+crc32   - checksum calculation
+custombtn- custom button check
+dcache  - enable or disable data cache
+detect_qcn9224- Detect qcn9224 version and populate it on qcn9224_version Env
+dhcp    - boot image via network using DHCP/TFTP protocol
+dm      - Driver model low level access
+dpr_execute- Debug Policy Request processing
+
+echo    - echo args to console
+editenv - edit environment variable
+env     - environment handling commands
+erase   - erase FLASH memory
+exectzt - execute TZT
+
+exit    - exit script
+false   - do nothing, unsuccessfully
+fdt     - flattened device tree utility commands
+flash   - flash part_name 
+	flash part_name load_addr file_size 
+
+flasherase- flerase part_name 
+
+flashinit- flashinit nand/mmc 
+
+flinfo  - print FLASH memory information
+flupdate- flupdate set mmc/nand/nor ; flupdate clear 
+
+fuse_qcn9224- Fuse QCN9224 V2 fuses and argument is PCIe device ID
+fuseipq - fuse QFPROM registers from memory
+
+go      - start application at address 'addr'
+help    - print command description/usage
+icache  - enable or disable instruction cache
+imxtract- extract a part of a multi-image
+ipq_mdio- IPQ mdio utility commands
+ipq_mii - IPQ mii utility commands
+is_sec_boot_enabled- check secure boot fuse is enabled or not
+
+itest   - return true/false on integer compare
+led     - [all] [on|off|toggle|blink] [blink-freq in ms]
+ledblink- led blink
+list_ipq5332_fuse- fuse set of QFPROM registers from memory
+
+list_pci- Print the RC's PCIe details and attached device ID
+list_qcn9224_fuse- Print QCN9224 fuse details from attached PCIe slots
+loop    - infinite loop on address range
+md      - memory display
+mibib_reload- mibib_reload fl_type pg_size blk_size chip_size
+
+mii     - MII utility commands
+mm      - memory modify (auto-incrementing address)
+mtdparts- define flash/nand partitions
+mtest   - simple RAM read/write test
+mw      - memory write (fill)
+nand    - NAND sub-system
+nboot   - boot from NAND device
+nm      - memory modify (constant address)
+part    - disk partition related commands
+pci     - list and access PCI Configuration Space
+ping    - send ICMP ECHO_REQUEST to network host
+printenv- print environment variables
+protect - enable or disable FLASH write protection
+qpic_nand- Switch between SBL and Linux kernel page on 4K NAND Flash.
+reset   - Perform RESET of the CPU
+run     - run commands in an environment variable
+runmulticore- Enable and schedule secondary cores
+saveenv - save environment variables to persistent storage
+secure_authenticate- authenticate the signed image
+
+setenv  - set environment variables
+setexpr - set environment variable as the result of eval expression
+sf      - SPI flash sub-system
+showvar - print local hushshell variables
+sleep   - delay execution for some time
+smeminfo- print SMEM FLASH information
+source  - run script from memory
+test    - minimal test like /bin/sh
+tftpboot- boot image via network using TFTP protocol
+tftpput - TFTP put command, for uploading files to a server
+true    - do nothing, successfully
+tzt     - load and run tzt
+
+uart    - UART sub-system
+ubi     - ubi commands
+version - print monitor, compiler and linker version
+xtract_n_flash- xtract_n_flash addr filename partname 
+
+zip     - zip a memory region
+IPQ5332# bdinfo
+arch_number = 0x08060000
+boot_params = 0x40000100
+DRAM bank   = 0x00000000
+-> start    = 0x40000000
+-> size     = 0x20000000
+eth0name    = eth0
+ethaddr     = 00:03:7f:ba:db:ad
+current eth = eth0
+ip_addr     = 192.168.1.119
+baudrate    = 115200 bps
+TLB addr    = 0x4A4A0000
+relocaddr   = 0x4A400000
+reloc off   = 0x00000000
+irq_sp      = 0x4A2BFA90
+sp start    = 0x4A2BFA80
+IPQ5332# printenv
+baudrate=115200
+bootargs=console=ttyMSM0,115200n8
+bootcmd=bootipq
+bootdelay=1
+ethact=eth0
+ethaddr=00:03:7f:ba:db:ad
+fdt_high=0x48500000
+fdtcontroladdr=4a4a4004
+flash_type=11
+ipaddr=192.168.1.119
+machid=8060000
+netmask=255.255.255.0
+serverip=192.168.1.88
+soc_hw_version=201a0101
+soc_version_major=1
+soc_version_minor=1
+stderr=serial@78AF000
+stdin=serial@78AF000
+stdout=serial@78AF000
+
+Environment size: 422/262140 bytes
+IPQ5332# 

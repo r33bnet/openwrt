@@ -18,6 +18,10 @@ menu "Target Images"
 			default TARGET_INITRAMFS_COMPRESSION_LZMA if TARGET_mpc85xx
 			default TARGET_INITRAMFS_COMPRESSION_LZMA if TARGET_ramips
 			default TARGET_INITRAMFS_COMPRESSION_ZSTD if TARGET_qualcommax
+			# Cudy WR11000: stock U-Boot unpacks at most
+			# CONFIG_SYS_BOOTM_LEN (64 MiB); an uncompressed initramfs
+			# with Wi-Fi does not fit.
+			default TARGET_INITRAMFS_COMPRESSION_ZSTD if TARGET_qualcommbe_ipq53xx_DEVICE_cudy_wr11000
 			default TARGET_INITRAMFS_COMPRESSION_ZSTD if TARGET_microchipsw
 			default TARGET_INITRAMFS_COMPRESSION_XZ if USES_SEPARATE_INITRAMFS
 			default TARGET_INITRAMFS_COMPRESSION_NONE

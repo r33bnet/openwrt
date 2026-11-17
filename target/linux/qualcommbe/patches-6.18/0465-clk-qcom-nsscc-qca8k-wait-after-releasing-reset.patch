@@ -1,0 +1,26 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] clk: qcom: nsscc-qca8k: wait after releasing the chip reset
+
+nss_cc_qca8k_clock_enable_and_reset() releases the QCA8084/QCA8386 reset
+and registers the clocks immediately. When U-Boot has not brought the
+chip up first (Cudy WR11000 booting from flash), the first access after
+a cold start can find the critical branches still stuck at 'off', and
+the whole clock controller fails to probe with -EBUSY. The vendor mdio
+driver waits 100 ms after releasing the same reset; do the same.
+
+---
+--- a/drivers/clk/qcom/nsscc-qca8k.c
++++ b/drivers/clk/qcom/nsscc-qca8k.c
+@@ -2180,6 +2180,12 @@
+ 	} else if (gpiod) {
+ 		msleep(100);
+ 		gpiod_set_value_cansleep(gpiod, 0);
++		/* Let the chip come out of reset before its clock
++		 * controller is programmed (the vendor driver waits
++		 * 100 ms here too). Without it a cold start can find
++		 * the critical branches still stuck at 'off'.
++		 */
++		msleep(100);
+ 	}
+ 
+ 	return 0;

@@ -15,6 +15,20 @@ ipq53xx_setup_interfaces()
 	ubnt,u7-pro-xgs)
 		ucidef_set_interface_lan "lan"
 		;;
+	cudy,wr11000)
+		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan"
+		# bdinfo 0xde00 holds the base MAC (vendor nss-dp: LAN = base,
+		# WAN = base + 1). The DSA ports would otherwise all inherit the
+		# conduit address, so give WAN its own.
+		lan_mac=$(mtd_get_mac_binary "bdinfo" 0xde00)
+		if [ -n "$lan_mac" ]; then
+			wan_mac=$(macaddr_add "$lan_mac" 1)
+			ucidef_set_network_device_mac "wan" "$wan_mac"
+			ucidef_set_interface_macaddr "lan" "$lan_mac"
+			ucidef_set_interface_macaddr "wan" "$wan_mac"
+			ucidef_set_label_macaddr "$lan_mac"
+		fi
+		;;
 	gl.inet,gl-be6500)
 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" "wan"
 		wan_mac=$(mtd_get_mac_binary "0:art" 0xa)

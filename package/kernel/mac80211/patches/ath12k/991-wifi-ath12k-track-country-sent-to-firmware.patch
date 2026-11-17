@@ -1,0 +1,69 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] wifi: ath12k: compare user country against what firmware was sent
+
+ath12k_reg_notifier() skips a user regulatory hint when its alpha2 equals
+hw->wiphy->regd. That regd only tracks the last regulatory event ath12k
+accepted, not the country the firmware is actually running.
+
+Seen on IPQ5332 + QCN9274 (Cudy WR11000): a fresh OpenWrt config sets
+country "00" on the 6 GHz radio. The firmware applies it and replies with
+status PASS and zero rules; ath12k rejects that event ("No reg rules
+available"), so wiphy->regd keeps the boot-time "US". When the user then
+sets "US", the notifier sees no change and never sends it. The firmware
+stays on "00" and refuses every DFS channel ("vdev start resp error
+status 4 (invalid regdomain)").
+
+Forwarding every hint instead fixes that, but OpenWrt re-sets the country
+on every wifi reload; each resend makes the firmware re-apply it, the
+channel list is rebuilt, DFS channel state is reset and a 5 GHz AP on a
+DFS channel is stopped.
+
+So skip only when the country matches what was last sent to every radio
+(ar->alpha2, which the current-country and 11d paths already maintain).
+Record it in the init-country path too.
+
+Known gap: after a firmware crash the init-country path does not resend
+ar->alpha2 (only current_cc_support devices do), so a non-default country
+is not restored until it changes.
+
+---
+--- a/drivers/net/wireless/ath/ath12k/reg.c
++++ b/drivers/net/wireless/ath/ath12k/reg.c
+@@ -92,9 +92,27 @@
+ 		return;
+ 	}
+ 
++	/* hw->wiphy->regd only reflects the last regulatory event ath12k
++	 * accepted. A request the firmware applies but answers with no
++	 * rules (alpha2 "00") is dropped, so wiphy->regd keeps the boot
++	 * country while the firmware runs "00". Compare against what was
++	 * last sent to every radio instead, so the user's country still
++	 * goes out once, and repeated identical requests (every wifi
++	 * reload) do not make the firmware re-apply it and reset the DFS
++	 * state of a running AP.
++	 */
+ 	if (!ath12k_regdom_changes(hw, request->alpha2)) {
+-		ath12k_dbg(ar->ab, ATH12K_DBG_REG, "Country is already set\n");
+-		return;
++		bool sent = true;
++
++		for_each_ar(ah, ar, i)
++			if (memcmp(ar->alpha2, request->alpha2, 2))
++				sent = false;
++
++		ar = ath12k_ah_to_ar(ah, 0);
++		if (sent) {
++			ath12k_dbg(ar->ab, ATH12K_DBG_REG, "Country is already set\n");
++			return;
++		}
+ 	}
+ 
+ 	/* Allow fresh updates to wiphy regd */
+@@ -115,6 +133,7 @@
+ 			arg.flags = ALPHA_IS_SET;
+ 			memcpy(&arg.cc_info.alpha2, request->alpha2, 2);
+ 			arg.cc_info.alpha2[2] = 0;
++			memcpy(&ar->alpha2, request->alpha2, 2);
+ 
+ 			ret = ath12k_wmi_send_init_country_cmd(ar, &arg);
+ 			if (ret)

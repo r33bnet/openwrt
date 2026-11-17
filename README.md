@@ -13,6 +13,11 @@ switch and a **RTL8221B** 2.5G WAN PHY.
 
 Target: **`qualcommbe/ipq53xx`**, kernel **6.18**.
 
+> [!NOTE]
+> Branch `cudy-wr11000` adds an untested bring-up port of the **Cudy WR11000**
+> (IPQ5322, SPI-NAND, QCA8386 switch). See
+> [docs/cudy-wr11000/README.md](docs/cudy-wr11000/README.md).
+
 > [!WARNING]
 > **Unofficial, community-maintained port — not affiliated with, endorsed by, or supported
 > by GL.iNet or the OpenWrt project.** Provided **as-is, with no warranty of any kind**.

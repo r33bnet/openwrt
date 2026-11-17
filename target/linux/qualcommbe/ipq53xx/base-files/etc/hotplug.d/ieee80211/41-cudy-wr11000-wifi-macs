@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Cudy WR11000: give the three radios the MAC addresses stock firmware uses.
+#
+# Stock (etc/uci-defaults/99_oem) derives them from the bdinfo base MAC:
+#   radio0  2.4 GHz  base       (same as LAN, as on stock)
+#   radio1  5 GHz    base + 2
+#   radio2  6 GHz    base + 3
+# WAN is base + 1 (board.d/02_network).
+#
+# The device tree points ath12k at the same base, so the phy address is
+# already stable; this sets macaddr_base per radio so the first BSS on each
+# band matches stock. Further BSSes on a band get locally administered
+# addresses from the wifi scripts, so they cannot collide with WAN.
+#
+# Runs on every ieee80211 add event, after 10-wifi-detect has written the
+# wireless config, and only fills in radios that have no macaddr_base yet.
+# Keyed on the "radio" index, not "band": band can be missing from a
+# hand-edited config.
+
+[ "$ACTION" = add ] || exit 0
+
+. /lib/functions.sh
+. /lib/functions/system.sh
+
+[ "$(board_name)" = "cudy,wr11000" ] || exit 0
+[ -f /etc/config/wireless ] || exit 0
+
+LOG_TAG=cudy-wifi-macs
+
+base=$(mtd_get_mac_binary bdinfo 0xde00)
+[ -n "$base" ] || {
+	logger -t "$LOG_TAG" -p daemon.warn "no base MAC in bdinfo@0xde00; leaving Wi-Fi MACs alone"
+	exit 0
+}
+
+changed=0
+for dev in $(uci -q show wireless | sed -n "s/^wireless\.\([^.]*\)=wifi-device$/\1/p"); do
+	[ -n "$(uci -q get "wireless.$dev.macaddr_base")" ] && continue
+
+	case "$(uci -q get "wireless.$dev.path")" in
+	*c000000.wifi) ;;
+	*) continue ;;
+	esac
+
+	case "$(uci -q get "wireless.$dev.radio")" in
+	0) mac="$base" ;;
+	1) mac=$(macaddr_add "$base" 2) ;;
+	2) mac=$(macaddr_add "$base" 3) ;;
+	*) continue ;;
+	esac
+
+	uci set "wireless.$dev.macaddr_base=$mac"
+	changed=1
+done
+
+[ "$changed" = 1 ] || exit 0
+
+uci commit wireless
+logger -t "$LOG_TAG" "set per-radio macaddr_base from bdinfo base $base"
+
+# Reload once after the event storm, unless another instance already does.
+(
+	sleep 5
+	[ -f /var/run/cudy-wifi-macs.reload ] && exit 0
+	: > /var/run/cudy-wifi-macs.reload
+	/sbin/wifi reload
+	rm -f /var/run/cudy-wifi-macs.reload
+) &
+
+exit 0

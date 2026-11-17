@@ -1,7 +1,7 @@
 REQUIRE_IMAGE_METADATA=1
 RAMFS_COPY_BIN='dumpimage fitblk fit_check_sign'
 
-gl_be6500_remove_oem_rootfs() {
+remove_oem_ubi_rootfs() {
 	local mtdnum
 	local ubidev
 	local ubivol
@@ -29,9 +29,16 @@ gl_be6500_remove_oem_rootfs() {
 
 platform_do_upgrade() {
 	case "$(board_name)" in
+	cudy,wr11000)
+		# Stock QSDK firmware leaves an "ubi_rootfs" volume behind that
+		# would eat the space nand_do_upgrade needs for rootfs_data.
+		CI_UBIPART="rootfs"
+		remove_oem_ubi_rootfs || return 1
+		nand_do_upgrade "$1"
+		;;
 	gl.inet,gl-be6500)
 		CI_UBIPART="rootfs"
-		gl_be6500_remove_oem_rootfs || return 1
+		remove_oem_ubi_rootfs || return 1
 		nand_do_upgrade "$1"
 		;;
 	gl.inet,gl-be9300)
@@ -54,6 +61,7 @@ platform_check_image() {
 	[ "$#" -gt 1 ] && return 1
 
 	case "$(board_name)" in
+	cudy,wr11000|\
 	gl.inet,gl-be6500)
 		return 0
 		;;

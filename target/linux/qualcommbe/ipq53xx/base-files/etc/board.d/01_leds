@@ -9,6 +9,9 @@ board_config_update
 board=$(board_name)
 
 case "$board" in
+cudy,wr11000)
+	ucidef_set_led_netdev "internet" "internet" "green:wan" "wan" "link"
+	;;
 ubnt,u7-pro-xgs)
 	ucidef_set_led_wlan "wifi" "wifi" "blue:wlan" "phy0radio"
 	;;

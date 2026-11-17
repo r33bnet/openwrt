@@ -25,6 +25,44 @@ define Build/gl-be9300-factory
 	rm -f $@.its
 endef
 
+# FIT for a 32-bit QSDK U-Boot that boots an arm64 kernel. U-Boot 2016's
+# fit_image_check_arch() wants an exact match with its own IH_ARCH (arm) and
+# rejects "arm64" with "Unsupported Architecture", but boot_jump_linux() still
+# spots the aarch64 Image header and switches to AArch64 through
+# jump_kernel64(). So build the normal ITS and relabel every image "arm".
+define Build/fit-arm32-uboot
+	$(call Build/fit-its,$(1))
+	$(SED) 's/arch = "arm64";/arch = "arm";/' $@.its
+	$(call Build/fit-image,$(1))
+endef
+
+define Device/cudy_wr11000
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Cudy
+	DEVICE_MODEL := WR11000
+	SOC := ipq5332
+	SUPPORTED_DEVICES += cudy,wr11000
+	# Stock U-Boot (machid 0x8060000, AP-MI01.6) asks for this config by
+	# name: "Using 'config@mi01.6' configuration" in the stock boot log.
+	DEVICE_DTS_CONFIG := config@mi01.6
+	# U-Boot reads the FIT from UBI to CONFIG_SYS_LOAD_ADDR = 0x41000000;
+	# decompressing the kernel to the target default (also 0x41000000)
+	# would overwrite the FIT mid-boot ("new format image overwritten").
+	KERNEL_LOADADDR := 0x42000000
+	KERNEL = kernel-bin | libdeflate-gzip | \
+		fit-arm32-uboot gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb
+	KERNEL_INITRAMFS = kernel-bin | libdeflate-gzip | \
+		fit-arm32-uboot gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	# One rootfs slot: 0x1040000-0x4460000 on the SPI-NAND.
+	IMAGE_SIZE := 53376k
+	DEVICE_PACKAGES := kmod-ath12k ath12k-firmware-ipq5332 \
+		ath12k-firmware-qcn9274 ipq-wifi-cudy_wr11000 kmod-qrtr-smd
+endef
+TARGET_DEVICES += cudy_wr11000
+
 define Device/ubnt_u7-pro-xgs
 	DEVICE_VENDOR := Ubiquiti
 	DEVICE_MODEL := UniFi 7

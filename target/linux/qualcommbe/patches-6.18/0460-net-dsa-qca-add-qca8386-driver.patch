@@ -1,0 +1,34 @@
+From: SPNMX57 OpenWrt port
+Subject: [PATCH] net: dsa: qca: add QCA8386 (Manhattan) switch driver
+
+Hook up the QCA8386 DSA driver carried in files/drivers/net/dsa/qca/qca8386.c.
+The QCA8386 pairs a qca8k-family switch core with four QCA8084 2.5G PHYs and
+an NSS clock controller, all behind one indirect MDIO window. qca8k cannot
+drive it: the page register and the upper-16-bit register decode differ.
+
+The driver comes from https://github.com/louij2/linksys-spnmx57-openwrt
+(60746fd9b347, OpenWrt PR #25902), where it runs on the IPQ5018-based Linksys
+SPNMX57. Here it is used for the Cudy WR11000 (IPQ5322).
+---
+--- a/drivers/net/dsa/qca/Kconfig
++++ b/drivers/net/dsa/qca/Kconfig
+@@ -24,3 +24,12 @@
+ 	help
+ 	  This enabled support for LEDs present on the Qualcomm Atheros
+ 	  QCA8K Ethernet switch chips.
++
++config NET_DSA_QCA8386
++	tristate "Qualcomm QCA8386 (Manhattan) Ethernet switch support"
++	depends on NET_DSA
++	select NET_DSA_TAG_QCA
++	select REGMAP
++	help
++	  This enables support for the Qualcomm QCA8386 ("Manhattan"/MHT)
++	  Ethernet switch, as found on the Linksys SPNMX57 and Cudy WR11000.
+--- a/drivers/net/dsa/qca/Makefile
++++ b/drivers/net/dsa/qca/Makefile
+@@ -5,3 +5,4 @@
+ ifdef CONFIG_NET_DSA_QCA8K_LEDS_SUPPORT
+ qca8k-y				+= qca8k-leds.o
+ endif
++obj-$(CONFIG_NET_DSA_QCA8386)	+= qca8386.o

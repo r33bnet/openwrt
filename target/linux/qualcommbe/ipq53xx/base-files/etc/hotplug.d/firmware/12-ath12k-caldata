@@ -7,6 +7,10 @@ board=$(board_name)
 case "$FIRMWARE" in
 "ath12k/IPQ5332/hw1.0/cal-ahb-c000000.wifi.bin")
 	case "$board" in
+	cudy,wr11000)
+		# vendor ftm.conf ap-mi01.6: board 0x16 at ART 0x1000
+		caldata_extract "0:art" 0x1000 0x20000
+		;;
 	gl.inet,gl-be6500)
 		caldata_extract "0:art" 0x1000 0x20000
 		;;
@@ -17,6 +21,11 @@ case "$FIRMWARE" in
 	;;
 "ath12k/QCN9274/hw2.0/cal-pci-0001:01:00.0.bin")
 	case "$board" in
+	cudy,wr11000)
+		# vendor ftm.conf ap-mi01.6: board 0x1019 (slot 2) at ART
+		# 0x58800, dual-MAC BDF size 0x27800 - same as the GL-BE9300
+		caldata_extract "0:art" 0x58800 0x27800
+		;;
 	gl.inet,gl-be6500)
 		caldata_extract "0:art" 0x58800 0x18800
 		;;
