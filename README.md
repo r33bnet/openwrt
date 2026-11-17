@@ -135,7 +135,7 @@ Output in `bin/targets/qualcommbe/ipq53xx/`:
 
 ## First boot (RAM only, nothing written)
 
-UART is 115200 8N1. Press a key during the 1 s autoboot window.
+UART is 115200 8N1. Type 'csp' during the 1s autoboot window:
 
 ```
 setenv ipaddr 192.168.1.1
@@ -225,9 +225,9 @@ Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
 | QCA8386 / DSA: WAN + 3 LAN at 1 Gbit/s, 2.5G CPU link | working, including cold boots from NAND (patches 0463, 0465, 0466) |
 | Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US) |
 | Wi-Fi MACs from bdinfo | working, same as stock |
-| MLO client (STA) | associates, then floods fw-stats errors (open item 9) |
+| MLO client (STA) | associates and working |
 | LEDs / buttons | not checked |
-| Return to stock | procedure above, not yet run |
+| Return to stock | procedure above, tested |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 
 ## Files added or changed for this device
