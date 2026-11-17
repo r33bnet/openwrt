@@ -59,7 +59,9 @@ define Device/cudy_wr11000
 	# One rootfs slot: 0x1040000-0x4460000 on the SPI-NAND.
 	IMAGE_SIZE := 53376k
 	DEVICE_PACKAGES := kmod-ath12k ath12k-firmware-ipq5332 \
-		ath12k-firmware-qcn9274 ipq-wifi-cudy_wr11000 kmod-qrtr-smd
+		ath12k-firmware-qcn9274 ipq-wifi-cudy_wr11000 kmod-qrtr-smd \
+		-wpad-basic-mbedtls wpad-openssl \
+		-libustream-mbedtls libustream-openssl
 endef
 TARGET_DEVICES += cudy_wr11000
 
