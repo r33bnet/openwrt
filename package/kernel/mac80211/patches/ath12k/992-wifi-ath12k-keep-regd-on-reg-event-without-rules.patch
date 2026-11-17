@@ -1,0 +1,75 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] wifi: ath12k: keep the regd when a reg event has no rules
+
+On IPQ5332 + QCN9274 (Cudy WR11000) the firmware answers a country
+request with status PASS and zero regulatory rules (seen for alpha2
+"00"; see also 991-wifi-ath12k-track-country-sent-to-firmware.patch).
+ath12k_pull_reg_chan_list_ext_update_ev() treats that as a parse error,
+so ath12k_reg_chan_list_event() ends in its fallback path and hits
+WARN_ON(1) - the "rare, TODO" case meant for firmware and host
+disagreeing about an applied regd. Every boot logs one stack trace per
+radio:
+
+  ath12k_wifi7_ahb c000000.wifi: No reg rules available
+  ath12k_wifi7_ahb c000000.wifi: failed to extract regulatory info from received event
+  WARNING: ... at drivers/net/wireless/ath/ath12k/wmi.c:7097 ath12k_wmi_op_rx
+
+The check also runs before phy_id is parsed, so the event's radio is
+unknown and its regd_update_completed is never signalled.
+
+Do the zero-rules check after the event header is parsed and return
+-ENODATA for it. The caller keeps the current regd, as for a dropped
+event, which is what already happened before minus the WARN, and still
+completes regd_update_completed for that radio.
+
+---
+--- a/drivers/net/wireless/ath/ath12k/wmi.c
++++ b/drivers/net/wireless/ath/ath12k/wmi.c
+@@ -6076,11 +6076,6 @@
+ 		}
+ 	}
+ 
+-	if (!total_reg_rules) {
+-		ath12k_warn(ab, "No reg rules available\n");
+-		return -EINVAL;
+-	}
+-
+ 	memcpy(reg_info->alpha2, &ev->alpha2, REG_ALPHA2_LEN);
+ 
+ 	reg_info->dfs_region = le32_to_cpu(ev->dfs_region);
+@@ -6111,6 +6106,17 @@
+ 		break;
+ 	}
+ 
++	/* Checked only now, so the caller still learns which radio the event
++	 * was for: some firmware answers a country request with no rules at
++	 * all (seen for alpha2 "00" on IPQ5332 and QCN9274, status PASS).
++	 */
++	if (!total_reg_rules) {
++		ath12k_info(ab, "no reg rules for alpha2 %c%c (phy %u, status %u), keeping current regd\n",
++			    reg_info->alpha2[0], reg_info->alpha2[1],
++			    reg_info->phy_id, le32_to_cpu(ev->status_code));
++		return -ENODATA;
++	}
++
+ 	reg_info->is_ext_reg_event = true;
+ 
+ 	reg_info->min_bw_2g = le32_to_cpu(ev->min_bw_2g);
+@@ -7031,6 +7037,17 @@
+ 	}
+ 
+ 	ret = ath12k_pull_reg_chan_list_ext_update_ev(ab, skb, reg_info);
++	if (ret == -ENODATA) {
++		/* Firmware applied the request but sent nothing to build a
++		 * regd from. Keep the current one, as for a dropped event:
++		 * this is not the "firmware and host disagree" case the
++		 * fallback WARN is for. Still signal the completion that
++		 * ath12k_mac_hw_register() may be waiting on.
++		 */
++		pdev_idx = reg_info->phy_id;
++		ret = ATH12K_REG_STATUS_VALID;
++		goto mem_free;
++	}
+ 	if (ret) {
+ 		ath12k_warn(ab, "failed to extract regulatory info from received event\n");
+ 		goto mem_free;
