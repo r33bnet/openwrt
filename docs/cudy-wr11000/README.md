@@ -10,13 +10,14 @@ Target `qualcommbe/ipq53xx`, kernel 6.18, profile **Cudy WR11000**
 > up the whole NAND (above all `0:ART`) before writing anything.
 
 **Tree base.** Branch `cudy-wr11000` is OpenWrt main of 2026-11-16
-(`393efd7d74`, Linux 6.18.60, backports 7.2, hostapd 2.12) plus three
-commits: the qualcommbe/ipq53xx + GL-BE9300 work rebased from the
-flint3-be9300 tree, this port, and the fixes the new base needed. What was
+(`393efd7d74`, Linux 6.18.60, backports 7.2, hostapd 2.12) plus commits
+for the qualcommbe/ipq53xx + GL-BE9300 work rebased from the flint3-be9300
+tree, this port, and the fixes the new base needed. What was
 dropped because main already has it, and what still needs porting, is
-listed in those commit messages. The hardware results below were obtained on the earlier
-base (Linux 6.18.39); the rebased tree has passed patch application checks
-but has not been booted yet.
+listed in those commit messages. On this base (2026-11-16): builds, TFTP
+boot, NAND install and a cold NAND boot work, with the switch and both Wi-Fi
+chips up (after patch 0467, open item 11). Other results below were first
+obtained on Linux 6.18.39.
 
 ## Hardware
 
