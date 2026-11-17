@@ -177,6 +177,14 @@ struct qca8386_priv {
 	struct clk_bulk_data clks[QCA8386_NUM_CLKS];
 
 	struct mutex reg_mutex;
+
+	/* CPU-port clock retime, deferred until UNIPHY1 runs; see
+	 * qca8386_cpu_port_clk_sync(). Protected by cpu_clk_lock.
+	 */
+	struct mutex cpu_clk_lock;
+	bool uniphy1_up;
+	int cpu_clk_speed;
+
 	struct dentry *debugfs;
 	u32 dbg_reg;
 	u8 switch_id;
@@ -575,6 +583,39 @@ static void qca8386_port_clk_rate_set(struct qca8386_priv *priv, int port,
 			 port, rate, ret);
 }
 
+/* The CPU port's tx clock (nss_cc_mac0_tx_clk_src) is re-parented from XO
+ * onto UNIPHY1_TX at 2.5G, and an RCG cannot complete a source switch while
+ * the new source is dead. UNIPHY1 is only brought up by the QCA8084 package
+ * config_init (patch 0461), which runs when the user-port PHYs attach. DSA
+ * resolves the CPU port's fixed link before it creates the user ports, so
+ * retiming in its mac_link_up() trips "rcg didn't update its configuration"
+ * in update_config(); the hardware then finishes the switch on its own once
+ * UNIPHY1 starts.
+ *
+ * So the CPU port only records the speed until the first user port is
+ * enabled. DSA calls port_enable() for a user port from ndo_open, after
+ * phylink connected its PHY, i.e. after the package config_init. Nothing can
+ * cross the CPU port before a user port is open, so no frame is lost.
+ */
+static void qca8386_cpu_port_clk_sync(struct qca8386_priv *priv, int speed,
+				      bool uniphy1_up)
+{
+	mutex_lock(&priv->cpu_clk_lock);
+
+	if (speed)
+		priv->cpu_clk_speed = speed;
+	if (uniphy1_up)
+		priv->uniphy1_up = true;
+
+	if (priv->uniphy1_up && priv->cpu_clk_speed) {
+		qca8386_port_clk_rate_set(priv, QCA8386_CPU_PORT,
+					  priv->cpu_clk_speed);
+		priv->cpu_clk_speed = 0;
+	}
+
+	mutex_unlock(&priv->cpu_clk_lock);
+}
+
 static void qca8386_port_set_status(struct qca8386_priv *priv, int port, int enable)
 {
 	u32 mask = QCA8386_PORT_STATUS_TXMAC | QCA8386_PORT_STATUS_RXMAC;
@@ -908,8 +949,13 @@ qca8386_phylink_mac_link_up(struct phylink_config *config,
 	int port = dp->index;
 	u32 reg;
 
-	/* Retime the datapath before the MAC is allowed to pass traffic. */
-	qca8386_port_clk_rate_set(priv, port, speed);
+	/* Retime the datapath before the MAC is allowed to pass traffic. The
+	 * CPU port may have to wait for UNIPHY1, see qca8386_cpu_port_clk_sync().
+	 */
+	if (dsa_port_is_cpu(dp))
+		qca8386_cpu_port_clk_sync(priv, speed, false);
+	else
+		qca8386_port_clk_rate_set(priv, port, speed);
 
 	if (phylink_autoneg_inband(mode)) {
 		reg = QCA8386_PORT_STATUS_LINK_AUTO;
@@ -959,6 +1005,12 @@ static const struct phylink_mac_ops qca8386_phylink_mac_ops = {
 static int qca8386_port_enable(struct dsa_switch *ds, int port,
 			       struct phy_device *phy)
 {
+	/* A user port being opened means its PHY is attached and the package
+	 * config_init has brought UNIPHY1 up: apply a deferred CPU retime.
+	 */
+	if (dsa_is_user_port(ds, port))
+		qca8386_cpu_port_clk_sync(ds->priv, 0, true);
+
 	qca8386_port_set_status(ds->priv, port, 1);
 
 	return 0;
@@ -1066,6 +1118,7 @@ static int qca8386_sw_probe(struct mdio_device *mdiodev)
 	}
 
 	mutex_init(&priv->reg_mutex);
+	mutex_init(&priv->cpu_clk_lock);
 
 	ret = qca8386_read_switch_id(priv);
 	if (ret)
