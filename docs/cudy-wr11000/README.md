@@ -4,11 +4,19 @@ Target `qualcommbe/ipq53xx`, kernel 6.18, profile **Cudy WR11000**
 (`cudy_wr11000`, DT compatible `cudy,wr11000`).
 
 > [!WARNING]
-> **None of this has run on hardware yet.** It is a first port, put together
-> from Cudy's GPL release (QSDK 12.5 / OpenWrt 21.02, board "R65"), the stock
-> v2.5.234 UART logs in this folder, and the working GL-BE9300/BE6500 ports
-> in this tree. Use a serial console and back up the whole NAND (above all
-> `0:ART`) before writing anything.
+> Tested on one unit (see Status), built from Cudy's GPL release (QSDK 12.5 /
+> OpenWrt 21.02, board "R65"), the stock v2.5.234 UART logs in this folder,
+> and the GL-BE9300/BE6500 ports in this tree. Use a serial console and back
+> up the whole NAND (above all `0:ART`) before writing anything.
+
+**Tree base.** Branch `cudy-wr11000` is OpenWrt main of 2026-11-16
+(`393efd7d74`, Linux 6.18.60, backports 7.2, hostapd 2.12) plus three
+commits: the qualcommbe/ipq53xx + GL-BE9300 work rebased from the
+flint3-be9300 tree, this port, and the fixes the new base needed. What was
+dropped because main already has it, and what still needs porting, is
+listed in those commit messages. The hardware results below were obtained on the earlier
+base (Linux 6.18.39); the rebased tree has passed patch application checks
+but has not been booted yet.
 
 ## Hardware
 
