@@ -1,164 +1,256 @@
-> [!NOTE]
-> Branch `cudy-wr11000` adds an untested bring-up port of the **Cudy WR11000**
-> (IPQ5322, SPI-NAND, QCA8386 switch). See
-> [docs/cudy-wr11000/README.md](docs/cudy-wr11000/README.md).
+# Cudy WR11000 — mainline OpenWrt port (bring-up)
+
+Target `qualcommbe/ipq53xx`, kernel 6.18, profile **Cudy WR11000**
+(`cudy_wr11000`, DT compatible `cudy,wr11000`).
 
 > [!WARNING]
-> **Unofficial, community-maintained port — not affiliated with, endorsed by, or supported
-> by GL.iNet or the OpenWrt project.** Provided **as-is, with no warranty of any kind**.
-> Flashing third-party firmware carries real risk, including bricking the device, and may
-> void your hardware warranty. **Back up your eMMC first** — the ART partition holds your
-> unit's unique radio calibration data and MAC addresses and cannot be recovered from
-> anywhere else. If this router matters to you, test on a spare unit before relying on it.
+> Tested on one unit (see Status), built from Cudy's GPL release (QSDK 12.5 /
+> OpenWrt 21.02, board "R65"), the stock v2.5.234 UART logs in this folder,
+> and the GL-BE9300/BE6500 ports in this tree. Use a serial console and back
+> up the whole NAND (above all `0:ART`) before writing anything.
+
+**Tree base.** Branch `cudy-wr11000` is OpenWrt main of 2026-11-16
+(`393efd7d74`, Linux 6.18.60, backports 7.2, hostapd 2.12) plus commits
+for the qualcommbe/ipq53xx + GL-BE9300 work rebased from the flint3-be9300
+tree, this port, and the fixes the new base needed. What was
+dropped because main already has it, and what still needs porting, is
+listed in those commit messages. On this base (2026-11-16): builds, TFTP
+boot, NAND install and a cold NAND boot work, with the switch and both Wi-Fi
+chips up (after patch 0467, open item 11). Other results below were first
+obtained on Linux 6.18.39.
 
 ## Hardware
 
-| Block | Detail |
-|---|---|
-| SoC | Qualcomm IPQ5332, 4× Cortex-A53 |
-| Wi-Fi 2.4 GHz | on-SoC radio, ath12k over AHB |
-| Wi-Fi 5 / 6 GHz | 2× QCN9274, ath12k over PCIe |
-| Switch | RTL8372N, out-of-tree DSA driver (`realtek,rtl837x`); SoC↔switch link is 10GBASE-R |
-| WAN | RTL8221B 2.5G, USXGMII |
-| Storage | eMMC |
+| Block | Detail | Source |
+|---|---|---|
+| SoC | Qualcomm **IPQ5322** (IPQ5332 family), 4× Cortex-A53 | boot log `CPU: IPQ5322` |
+| RAM | 512 MiB DDR4 | U-Boot `DRAM: 512 MiB` |
+| Flash | 128 MiB SPI-NAND, GigaDevice GD5F1GM7REYIG, on QPIC | U-Boot / kernel log |
+| Reference design | AP-MI01.6, machid `0x8060000`, Cudy board "R65" | `model = .../AP-MI01.6/R65` |
+| Wi-Fi 2.4 GHz | on-SoC, ath12k AHB, board-id `0x16` | vendor DT `&wifi0` |
+| Wi-Fi 5 + 6 GHz | 1× QCN9224 dual-MAC on PCIe1, board-id `0x1019` | boot log `amss_dualmac.bin` |
+| Switch | **QCA8386** ("Manhattan"), 4× 2.5G PHY at MDIO 1–4, reset GPIO 51 | vendor DT, ssdk log |
+| Ports | switch port 1 = WAN, ports 2–4 = LAN | vendor `board.d/01_network` |
+| LEDs | internet green 32 / red 33, WPS 34, Wi-Fi 36, status 37 | vendor DT |
+| Buttons | reset GPIO 30, WPS GPIO 35 (active low) | vendor DT |
 
-## Status
+### NAND layout (SMEM partition table)
 
-| Subsystem | State |
-|---|---|
-| Boot / procd / SSH | working |
-| LAN (RTL8372N via DSA + EDMA/PPE) | working |
-| WAN (2.5G, USXGMII) | working, links at 2.5 Gbps |
-| VLANs (bridge-vlan on DSA) | working |
-| PPE hardware flow offload | IPv4 LAN→WAN NAT (TCP/UDP, untagged or 802.1Q WAN) ~2.3 Gbit/s at ~1% CPU; opt-in via the firewall's hardware flow offloading. WAN→LAN and IPv6 in the next release |
-| Wi-Fi 7, all three bands | working |
-| MLO (AP MLD across 2.4/5/6 GHz) | working |
-| DFS | working, including several BSSes per DFS radio started together |
-| 802.11k / 802.11v | working |
-| eMMC sysupgrade + return to stock | working |
+| Offset | Name | Size | Content |
+|---|---|---|---|
+| 0x0000000–0x0a80000 | SBL1, MIBIB, BOOTCONFIG, QSEE, DEVCFG, TME, CDT (+ `_1` copies) | | boot chain |
+| 0x0a80000 | 0:APPSBLENV | 1 MiB | U-Boot env (size 0x40000) |
+| 0x0b80000 | 0:APPSBL / 0:APPSBL_1 | 1.5 MiB each | U-Boot |
+| 0x0f00000 | **0:ART** | 1 MiB | radio calibration, unique per unit |
+| 0x1000000 | **bdinfo** | 256 KiB | base MAC, 6 bytes at `0xde00` |
+| 0x1040000 | **rootfs** | 52 MiB | UBI: `kernel`, `ubi_rootfs`, `rootfs_data` |
+| 0x4460000 | rootfs_1 | 52 MiB | the other firmware slot |
+| 0x7880000 | rundata, debug, backup | 1 MiB each | Cudy config |
 
-Throughput measured between two units over a 2.5G trunk: **~1.8–1.9 Gbit/s**.
+The SBL swaps the names `rootfs` and `rootfs_1` when it boots the second
+slot, so `rootfs` is always the slot U-Boot is about to boot. OpenWrt only
+ever writes `rootfs`, as the stock firmware's own `ubi.mtd=rootfs` does.
 
-## Known issues
+## What this port does, and why
 
-- **ath12k firmware hang under sustained load.** After hours with many clients
-  the Q6 can take a fatal error. Since 2026-09-28 the firmware coredump is
-  released automatically and the radios recover in seconds instead of staying
-  down; the cause of the crash itself is still open. Reported upstream.
-- **Kernel panic in netlink socket release**, seen six times since August on
-  both APs after hours of uptime (sockets of a bridge notification, hostapd
-  or wsdd2). The AP reboots itself in ~90 s. wsdd2 is kept disabled as one
-  trigger; root cause under investigation with a KASAN kernel.
-- **Client kicks for "excessive missing ACKs"**: the driver's packet-loss
-  events are unreliable for multi-link stations, so hostapd's
-  `disassoc_low_ack` now defaults to 0 in these images (set it to 1 on a
-  wifi-iface to restore the old behaviour).
-- **PPE WAN RX FIFO overruns.** Roughly 0.07–0.09 % of packets at ~1.9 Gbit/s.
-  No longer the hard ~600 Mbit/s cap earlier builds had, but not zero.
-- **802.11r is incompatible with MLO.** hostapd's FT code has no MLD
-  awareness — do not enable 11r on an MLO SSID. 11k/11v are fine.
+**Ethernet — QCA8386 through DSA.** No existing device in this tree has this
+switch, and mainline has no driver for it. The driver comes from the Linksys
+SPNMX57 port (IPQ5018 + QCA8386,
+[louij2/linksys-spnmx57-openwrt](https://github.com/louij2/linksys-spnmx57-openwrt)
+@ `60746fd9b347`, OpenWrt PR #25902), where it works on hardware. It lives in
+`target/linux/qualcommbe/files/drivers/net/dsa/qca/qca8386.c`, with:
+
+- `0460` — Kconfig/Makefile hook (`CONFIG_NET_DSA_QCA8386`, enabled for ipq53xx)
+- `0461`, `0462` — qca808x fixes for the PHY package in switch mode: UNIPHY1
+  SerDes bring-up and switch-core memory hand-over. They apply on this tree's
+  QCA8084 series 0301–0312, which is byte-identical to the series that port
+  used.
+- `0463` — marks the QCA8084 package bus clocks (AHB, MDIO, APB, switch core,
+  ...) `CLK_IS_CRITICAL`. The switch waits for `qcom-ppe`, a module, so
+  `clk_disable_unused()` used to gate them first; the switch then read ID
+  `0xbe` and its driver gave up (first boot, 2026-11-16).
+
+The switch's own clock controller (`qcom,qca8084-nsscc`) takes its 50 MHz XO
+from the SoC CMN PLL (`IPQ5332_ETH_50MHZ_CLK`). It owns the package reset on
+GPIO 51.
+
+**One uplink instead of two.** Stock firmware links switch port 0 to PPE port
+1 (LAN) *and* switch port 5 to PPE port 2 (WAN), each at 2.5G SGMII+. The DSA
+driver only knows one CPU port so far. So here, WAN is an ordinary DSA user
+port and LAN and WAN share the PPE port 1 ↔ switch port 0 link (`eth0`, the
+conduit). PPE port 2 / `pcs1` stay off. This caps combined WAN+LAN traffic at
+2.5 Gbit/s per direction.
+
+**Boot path — 32-bit U-Boot, 64-bit kernel.** Stock runs a 32-bit kernel
+from a 32-bit QSDK U-Boot 2016. That U-Boot can start an arm64 kernel: it
+detects the `Image` header and calls `jump_kernel64()`. Two things in the
+image recipe make it work:
+
+- `fit-arm32-uboot` labels every FIT image `arch = "arm"`. U-Boot's
+  `fit_image_check_arch()` rejects `"arm64"` outright.
+- `KERNEL_LOADADDR := 0x42000000`. U-Boot loads the FIT to its fixed
+  `0x41000000`, so decompressing to the target default `0x41000000` would
+  overwrite the FIT mid-boot.
+
+The FIT config is `config@mi01.6`, which is the name stock U-Boot asks for.
+U-Boot reads the UBI volume `kernel` from `rootfs`. OpenWrt's `UbiFit` layout
+names the squashfs volume `rootfs` (not `ubi_rootfs`), so the DTS appends
+`root=/dev/ubiblock0_1`.
+
+**Memory.** Uses the vendor 512 MiB profile: Q6 35 MiB at `0x4a900000`, then
+m3-dump, ETR, caldb, MLO at `0x4db00000`, and no `tzapp`. The QCN9224 host
+region uses the 50 MiB the GL ports run with. The vendor gives it 37 MiB; try
+`0x02500000` if RAM is tight. ramoops sits in the gap at `0x4da00000`, so a
+crash log survives a reboot.
+
+**Wi-Fi.**
+
+- `ipq-wifi-cudy_wr11000` holds `board-2.bin` containers keyed
+  `bus=ahb,…,qmi-board-id=22` and `bus=pci,…,qmi-board-id=4121`. The BDFs are
+  Cudy's own, from the stock firmware rootfs
+  (`/lib/firmware/IPQ5332/WIFI_FW/bdwlan.b16` and `…/qcn9224/bdwlan.b1019`).
+  The regdb is Cudy's too (`…/WIFI_FW/regdb.bin`). With it the firmware starts
+  on `US` (country 840, domain 0x16, FCC DFS) and accepts country changes with
+  status PASS; DFS works (5 GHz ch 116 at 160 MHz, tested 2026-11-16).
+- Calibration comes from `0:ART`: `0x1000` for the IPQ5332, and
+  `0x58800`/`0x27800` for the QCN9224. These offsets are from the vendor
+  `ftm.conf` (`ap-mi01.6,1019,2,362496,…`) and match the GL-BE9300.
+
+**MAC addresses.** `bdinfo` `0xde00` is the base. It goes to the conduit
+through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
 ## Building
 
 ```sh
-git clone -b flint3-be9300 https://github.com/perceival/openwrt-flint3.git
-cd openwrt-flint3
-./scripts/feeds update -a
-./scripts/feeds install -a
-make menuconfig     # Target System: Qualcomm Atheros 802.11be
-                    # Subtarget:     ipq53xx
-                    # Target Profile: GL.iNet GL-BE9300
-make -j"$(nproc)"
+./scripts/feeds update -a && ./scripts/feeds install -a
+make menuconfig   # Qualcomm Atheros 802.11be → ipq53xx → Cudy WR11000
+make -j$(nproc)
 ```
 
-Images land in `bin/targets/qualcommbe/ipq53xx/`.
+Output in `bin/targets/qualcommbe/ipq53xx/`:
 
-### Don't want to build from source?
+- `…-cudy_wr11000-initramfs-uImage.itb` — RAM boot, writes nothing
+- `…-cudy_wr11000-squashfs-sysupgrade.bin` — install from the initramfs
+- `…-cudy_wr11000-squashfs-factory.ubi` — raw UBI image of the `rootfs` slot
 
-Pre-built reference images are published periodically on the
-**[Releases page](https://github.com/perceival/openwrt-flint3/releases)**, in three flavours:
+## First boot (RAM only, nothing written)
 
-- **`vanilla`** — the exact, unmodified default this tree produces with zero customization
-  (no LuCI, `wpad-basic-mbedtls`) — what you'd get building it yourself with no changes
-- **`ap`** — full config (LuCI, tri-band MLO) plus the FT-over-MLO roaming series; what the
-  maintainer's own household runs
-- **`router`** — gateway role: LuCI, WireGuard, unbound, chrony, mDNS reflection; nftables
-  flowtable offload in software by default, PPE hardware offload opt-in (see Status)
+UART is 115200 8N1. Press a key during the 1 s autoboot window.
 
-See the disclaimer above before flashing any of them.
+```
+setenv ipaddr 192.168.1.1
+setenv serverip 192.168.1.2
+tftpboot 0x50000000 openwrt-qualcommbe-ipq53xx-cudy_wr11000-initramfs-uImage.itb
+bootm 0x50000000
+```
 
-## Installing
+Load to `0x50000000`, not the usual `0x44000000`. The kernel decompresses to
+`0x42000000` and an initramfs kernel runs past `0x44000000`. Everything from
+`0x4a100000` to `0x4a900000` is U-Boot/TZ/SMEM and must not be touched. Stock
+U-Boot's own defaults are `192.168.1.119` / `192.168.1.88`. U-Boot's TFTP
+works through the port the build calls `wan` (switch port 1; first-boot log).
 
-Full, hardware-verified instructions — including the round trip back to stock —
-are on the device page:
+Stock U-Boot unpacks at most `CONFIG_SYS_BOOTM_LEN` = 64 MiB. With Wi-Fi the
+initramfs must be compressed: *Target Images → ramdisk → Compression → zstd*
+(the default for this profile in a fresh `.config`). With `none` the unpacked
+kernel no longer fits and U-Boot refuses it.
 
-**https://openwrt.org/toh/gl.inet/gl-be9300**
+## Back up before installing
 
-Short version: from stock firmware, use the **factory** image with
-`sysupgrade -F -n`. The stock image check requires a QSDK FIT, so `-F` is
-required and the "missing section" warnings for `u-boot`/`tz`/`sb11` are
-expected. Do **not** force the plain sysupgrade image from stock.
+Boot the initramfs (nothing on NAND has changed yet), then pull every
+partition from a Linux/macOS shell on the PC. Do **not** copy partitions to
+`/tmp` on the router: that is RAM, the NAND is 128 MiB, and the router runs
+out of memory and reboots. Streaming over SSH keeps nothing on the router.
 
-Stock QSDK firmware may report `qcom,ipq5332-ap-mi01.6` as its board name.
-That is the generic Qualcomm MI01.6/RDP468 identity used by the vendor path,
-not the OpenWrt GL-BE9300 device identifier. The same compatible is used by
-the upstream Qualcomm RDP468 device tree, so it is intentionally not added to
-this profile's `SUPPORTED_DEVICES`: doing so would advertise the Flint 3 image
-as compatible with other hardware using that generic identity. The resulting
-stock compatibility warning is therefore expected; use the documented `-F`
-factory-image path instead (see [issue #9](https://github.com/perceival/openwrt-flint3/issues/9)).
+```sh
+R=root@192.168.1.1
+mkdir -p wr11000-backup && cd wr11000-backup
+ssh $R wifi down                       # frees a little RAM, stops log noise
+ssh $R cat /proc/mtd > proc_mtd.txt
+# /proc/mtd lines look like:  mtd17: 00100000 00020000 "0:art"
+grep '^mtd' proc_mtd.txt | while read -r dev size erase name; do
+	dev=${dev%:}
+	name=$(echo "$name" | tr -d '"' | tr ':' '_')
+	ssh -n $R "cat /dev/$dev" > "$name.bin"
+	want=$(ssh -n $R "md5sum /dev/$dev" | cut -d' ' -f1)
+	have=$(md5sum "$name.bin" | cut -d' ' -f1)
+	bytes=$(wc -c < "$name.bin")
+	if [ "$want" = "$have" ] && [ "$bytes" -eq $((0x$size)) ]; then
+		echo "OK        $dev $name.bin ($bytes bytes)"
+	else
+		echo "MISMATCH  $dev $name.bin ($bytes bytes, want $((0x$size)))"
+	fi
+done
+```
 
-**Back up your eMMC first** — the ART partition holds this unit's radio
-calibration and MAC addresses and cannot be recovered from anywhere else.
+Every line must say `OK`. Re-run the loop if one does not (a flaky link can
+truncate a stream). Keep `0_art.bin` and `bdinfo.bin` safe forever — they
+cannot be recreated.
 
-## Other boards
+## Install
 
-Only the GL-BE9300 is tested here. The tree is a `qualcommbe/ipq53xx` target, and anything that
-is not board-specific — the IPQ5332 clocks, PCIe, PPE/EDMA Ethernet and hardware offload, ath12k
-Wi-Fi and the firmware-recovery handler — is shared by every IPQ53xx device. What a new board
-needs is a device tree, an image definition and, if its switch is not a Realtek RTL837x, a
-matching switch driver.
+From the initramfs:
 
-**Defined in this tree, untested by me** (images are not published for them):
+```sh
+sysupgrade -n /tmp/openwrt-qualcommbe-ipq53xx-cudy_wr11000-squashfs-sysupgrade.bin
+```
 
-| Board | SoC | Switch | Flash | Origin | Notes |
-|---|---|---|---|---|---|
-| GL.iNet GL-BE6500 | IPQ5332 + QCN9274 | RTL837x (same driver) | NAND (UBI) | [JiaY-shi](https://github.com/JiaY-shi/openwrt) | closest relative; builds from this tree |
-| Ubiquiti UniFi 7 Pro XGS | IPQ5332 | none (single 10G PHY) | eMMC + SPI-NOR | Til Kaiser, upstream [#25185](https://github.com/openwrt/openwrt/pull/25185) | needs a bootloader downgrade (newer ones enforce signatures) |
+`platform.sh` first deletes the stock `ubi_rootfs` volume — otherwise the
+52 MiB UBI is too full for `rootfs_data` — then runs the usual
+`nand_do_upgrade` on `rootfs`. The other slot (`rootfs_1`) still holds stock
+firmware.
 
-**Other IPQ53xx devices with community work** (not in this tree):
+**Back to stock:** only `rootfs` was changed, so write your `rootfs.bin`
+backup back to it. TFTP-boot the initramfs first (the NAND system runs from
+`rootfs`), and stream the image instead of copying it to `/tmp` - it is
+52 MiB and `/tmp` is RAM. From the PC, next to the `wr11000-backup` folder:
 
-| Device | SoC | Switch | Status |
-|---|---|---|---|
-| Xiaomi BE3600 Pro (RN01) | IPQ5312 | Motorcomm YT9215S | ported on top of the upstream ipq53xx PR (Ethernet, storage, boot reported working) — [#23161](https://github.com/openwrt/openwrt/pull/23161) |
+```sh
+ssh root@192.168.1.1 "mtd write - rootfs" < wr11000-backup/rootfs.bin
+ssh root@192.168.1.1 "md5sum /dev/mtd19"     # must equal: md5sum wr11000-backup/rootfs.bin
+```
 
-**Upstream:** OpenWrt main has no IPQ53xx support yet. The subtarget is proposed in
-[openwrt/openwrt#23161](https://github.com/openwrt/openwrt/pull/23161) (open). The RTL8372N
-switch driver used here exists only in this tree.
+`wr11000-restore-stock.sh` / `.ps1` do the same with checks (RAM boot,
+partition size, md5 after writing). On Windows PowerShell use the `.ps1`:
+`<` and `>` there corrupt binary data. Then power-cycle.
 
-**Testers wanted.** If you own a GL-BE6500, a UniFi 7 Pro XGS or another IPQ53xx device and are
-comfortable with a serial console and an eMMC/NAND backup, I would like to hear from you: open an
-issue with the model, a boot log from stock and a photo of the board. Board support that nobody
-can test stays unpublished, and a second set of hands is the fastest way to change that. PRs
-bringing up another board on top of this branch are welcome too.
+## Status
 
-## Upstream
+Tested on hardware (2026-11-16, unit with stock firmware v2.5.234):
 
-Patches from this work that have gone upstream or are in review:
+| Subsystem | State |
+|---|---|
+| Build, TFTP initramfs boot | working (initramfs must be zstd, U-Boot unpacks ≤ 64 MiB) |
+| NAND sysupgrade and boot from NAND | working |
+| QCA8386 / DSA: WAN + 3 LAN at 1 Gbit/s, 2.5G CPU link | working, including cold boots from NAND (patches 0463, 0465, 0466) |
+| Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US) |
+| Wi-Fi MACs from bdinfo | working, same as stock |
+| MLO client (STA) | associates, then floods fw-stats errors (open item 9) |
+| LEDs / buttons | not checked |
+| Return to stock | procedure above, not yet run |
+| PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 
-- `wifi: ath12k: advertise AP_VLAN interface mode for IPQ5332` (linux-wireless)
-- hostapd WDS/AP_VLAN `bss->ctx` fix (applied by Jouni Malinen)
-- ath12k `hw_scan` NULL-deref report (with the Qualcomm dev team)
+## Files added or changed for this device
 
-## Links
-
-- Forum thread: https://forum.openwrt.org/t/gl-inet-flint-3-exploration-gl-be9300-ipq5332/250267
-- Device page: https://openwrt.org/toh/gl.inet/gl-be9300
-- Q6/PAS research notes: [`2.4GHZ-Q6-PAS-FINDINGS.md`](2.4GHZ-Q6-PAS-FINDINGS.md)
-
-## Credits
-
-Built on [JiaY-shi's](https://github.com/JiaY-shi/openwrt) GL-BE6500 tree, which
-provided the working IPQ5332 Wi-Fi and RTL837x DSA foundation. Thanks to
-everyone contributing hardware findings and testing via the issue tracker and
-the forum thread.
+```
+target/linux/qualcommbe/dts/ipq5332-wr11000.dts                       new
+target/linux/qualcommbe/files/drivers/net/dsa/qca/qca8386.c           new (SPNMX57 port)
+target/linux/qualcommbe/patches-6.18/0460-net-dsa-qca-add-qca8386-driver.patch
+target/linux/qualcommbe/patches-6.18/0461-net-phy-qca808x-bring-up-UNIPHY1-SerDes-in-switch-mode.patch
+target/linux/qualcommbe/patches-6.18/0462-net-phy-qca808x-configure-switch-core-memories-in-switch-mode.patch
+target/linux/qualcommbe/patches-6.18/0463-clk-qcom-nsscc-qca8k-keep-package-bus-clocks-on.patch
+target/linux/qualcommbe/patches-6.18/0466-net-pcs-qcom-ipq9574-provide-uniphy-50MHz-clock-out-as-a-clock.patch
+target/linux/qualcommbe/patches-6.18/0465-clk-qcom-nsscc-qca8k-wait-after-releasing-reset.patch
+target/linux/qualcommbe/ipq53xx/config-default                        CONFIG_NET_DSA_QCA8386=y
+target/linux/generic/config-6.18                                      # CONFIG_NET_DSA_QCA8386 is not set
+target/linux/qualcommbe/image/ipq53xx.mk                              Device/cudy_wr11000, Build/fit-arm32-uboot
+target/linux/qualcommbe/ipq53xx/base-files/etc/board.d/01_leds
+target/linux/qualcommbe/ipq53xx/base-files/etc/board.d/02_network
+target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/firmware/12-ath12k-caldata
+target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/ieee80211/41-cudy-wr11000-wifi-macs   new
+package/kernel/mac80211/patches/ath12k/991-wifi-ath12k-track-country-sent-to-firmware.patch   new
+target/linux/qualcommbe/ipq53xx/base-files/lib/upgrade/platform.sh     (BE6500 helper renamed remove_oem_ubi_rootfs)
+package/boot/uboot-tools/uboot-envtools/files/qualcommbe_ipq53xx
+package/firmware/ipq-wifi/Makefile, src/board-cudy_wr11000.{ipq5332,qcn9274}
+docs/cudy-wr11000/                                                     this file + stock logs
+```
