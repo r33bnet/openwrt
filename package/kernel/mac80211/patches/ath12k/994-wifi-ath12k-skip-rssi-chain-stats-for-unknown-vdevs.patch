@@ -1,0 +1,73 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] wifi: ath12k: skip RSSI chain stats for vdevs the host does not track
+
+On the Cudy WR11000 (IPQ5332 + dual-MAC QCN9224) an MLO station that
+reconnected across three links made every station statistics call
+fail. The per-chain RSSI request is sent with vdev_id 0, and the
+firmware answers with entries for the STA vdevs it has on that pdev.
+One of them could not be matched to a host link vif:
+
+  ath12k_wifi7_pci 0001:01:00.0: No VIF found for vdev 1
+  ath12k_wifi7_pci 0001:01:00.0: not found vif for vdev id 1
+  ath12k_wifi7_pci 0001:01:00.0: failed to pull fw stats: -71
+  ath12k_wifi7_pci 0001:01:00.0: time out while waiting for get fw stats
+
+about once a second from then on. ath12k_wmi_tlv_rssi_chain_parse()
+looked the vdev up only on the pdev named in the event and returned
+-EPROTO when it was not there. That drops the whole event, so
+fw_stats_done is never completed and every sta_statistics call blocks
+for the 1 s timeout.
+
+Look the vdev up across the device with
+ath12k_mac_get_arvif_by_vdev_id(), since vdev ids are allocated per ab
+and a dual-MAC chip has two pdevs. If it is still unknown, for example
+an MLO link vdev the host already tore down, skip that entry with a
+debug message and still mark the event as an RSSI chain reply so the
+waiter is completed. Do the same when the link station for the vif is
+missing.
+
+---
+--- a/drivers/net/wireless/ath/ath12k/wmi.c
++++ b/drivers/net/wireless/ath/ath12k/wmi.c
+@@ -8745,10 +8745,21 @@
+ 		return -EPROTO;
+ 	}
+ 
+-	arvif = ath12k_mac_get_arvif(ar, vdev_id);
++	/* Look across the whole device: vdev ids are allocated per ab, and on
++	 * a multi-pdev chip the vdev need not sit on the pdev in the event.
++	 * A vdev the host no longer tracks (an MLO link that was torn down)
++	 * is skipped rather than failing the whole event, which would leave
++	 * the requester waiting for fw_stats_done until it times out.
++	 */
++	arvif = NULL;
++	if (vdev_id >= 0 && vdev_id < 64)	/* allocated_vdev_map is a u64 */
++		arvif = ath12k_mac_get_arvif_by_vdev_id(ab, vdev_id);
+ 	if (!arvif) {
+-		ath12k_warn(ab, "not found vif for vdev id %d\n", vdev_id);
+-		return -EPROTO;
++		ath12k_dbg(ab, ATH12K_DBG_WMI,
++			   "skipping rssi chain stats for unknown vdev id %d\n",
++			   vdev_id);
++		stats->stats_id = WMI_REQUEST_RSSI_PER_CHAIN_STAT;
++		return 0;
+ 	}
+ 
+ 	ath12k_dbg(ab, ATH12K_DBG_WMI,
+@@ -8758,10 +8769,12 @@
+ 	guard(spinlock_bh)(&ab->base_lock);
+ 	arsta = ath12k_link_sta_find_by_addr(ab, arvif->bssid);
+ 	if (!arsta) {
+-		ath12k_warn(ab,
+-			    "not found link sta with bssid %pM for rssi chain\n",
+-			    arvif->bssid);
+-		return -EPROTO;
++		/* Same as above: skip the entry, keep the event. */
++		ath12k_dbg(ab, ATH12K_DBG_WMI,
++			   "skipping rssi chain stats, no link sta with bssid %pM\n",
++			   arvif->bssid);
++		stats->stats_id = WMI_REQUEST_RSSI_PER_CHAIN_STAT;
++		return 0;
+ 	}
+ 
+ 	BUILD_BUG_ON(ARRAY_SIZE(arsta->chain_signal) >
