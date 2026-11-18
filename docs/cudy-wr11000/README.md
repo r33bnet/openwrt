@@ -322,6 +322,7 @@ target/linux/qualcommbe/ipq53xx/base-files/etc/board.d/01_leds
 target/linux/qualcommbe/ipq53xx/base-files/etc/board.d/02_network
 target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/firmware/12-ath12k-caldata
 target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/ieee80211/41-cudy-wr11000-wifi-macs   new
+target/linux/qualcommbe/ipq53xx/base-files/etc/uci-defaults/97-cudy-wr11000-defaults   new (packet steering, irqbalance)
 package/kernel/mac80211/patches/ath12k/991-wifi-ath12k-track-country-sent-to-firmware.patch   new
 package/kernel/mac80211/patches/ath12k/992-wifi-ath12k-keep-regd-on-reg-event-without-rules.patch   new
 package/kernel/mac80211/patches/ath12k/993-wifi-ath12k-select-AHB-memory-mode-like-PCI.patch   new

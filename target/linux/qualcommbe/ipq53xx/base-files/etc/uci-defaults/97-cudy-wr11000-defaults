@@ -1,0 +1,36 @@
+#!/bin/sh
+# Cudy WR11000: performance defaults.
+#
+# - Packet steering on all CPUs (packet_steering '2') with 128 steering
+#   flows, so receive processing is spread over the four A53 cores.
+# - irqbalance enabled. The package ships it disabled
+#   (irqbalance.irqbalance.enabled='0'); spreading the Wi-Fi, PPE and
+#   PCIe interrupts over the cores helps throughput. Only images that
+#   include irqbalance have /etc/config/irqbalance (the minimal
+#   initramfs does not), so that part is skipped elsewhere.
+#
+# uci-defaults run on the first boot of every image, also after a
+# sysupgrade that keeps the configuration, so a manual change to these
+# options lasts until the next upgrade.
+. /lib/functions.sh
+
+[ "$(board_name)" = "cudy,wr11000" ] || exit 0
+
+if [ -f /etc/config/network ]; then
+	globals=$(uci -q show network | sed -n 's/^network\.\([^.=]*\)=globals$/\1/p' | head -n1)
+	if [ -z "$globals" ]; then
+		uci -q set network.globals=globals
+		globals=globals
+	fi
+	uci -q set "network.$globals.packet_steering=2"
+	uci -q set "network.$globals.steering_flows=128"
+	uci commit network
+fi
+
+if [ -f /etc/config/irqbalance ]; then
+	uci -q set irqbalance.irqbalance=irqbalance
+	uci -q set irqbalance.irqbalance.enabled='1'
+	uci commit irqbalance
+fi
+
+exit 0
