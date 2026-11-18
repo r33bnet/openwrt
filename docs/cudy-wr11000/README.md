@@ -17,7 +17,9 @@ dropped because main already has it, and what still needs porting, is
 listed in those commit messages. On this base (2026-11-16): builds, TFTP
 boot, NAND install and a cold NAND boot work, with the switch and both Wi-Fi
 chips up (after patch 0467, open item 11). Other results below were first
-obtained on Linux 6.18.39.
+obtained on Linux 6.18.39. Since then main is merged in rather than rebased
+onto; the last merge is main of 2026-11-18 (`2ccaccdb98`, still Linux
+6.18.60), built and re-tested as r38502.
 
 ## Hardware
 
@@ -135,12 +137,12 @@ through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
 If you do not want to build, `docs/cudy-wr11000/` has the two images that
 were installed and tested in Status, built from this branch at
-`r38495-3196e047d2` (2026-11-17):
+`r38502-e58fc0f8ae` (2026-11-18):
 
 | File | Use | Built from | SHA-256 |
 |---|---|---|---|
-| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `6cc5b898c4a5b9fc9c31633987ad87d13a039a318880071c92ac493688f349bc` |
-| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `dfe542346d16dcea954f7715660d2cccb0757cf4cabb066e25f8df0d79b3365d` |
+| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `eea6256e1948a5c73a1fc55f7b7f53bfa0b745e884418a5c5fa42e8d74537566` |
+| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `514e3fd1311c9c71948d9c0ed6b2e08869297cd7766570c502ea02ebe2edb146` |
 
 Check them first (`sha256sum wr11000_*`), then follow
 [First boot](#first-boot-ram-only-nothing-written),
@@ -300,7 +302,7 @@ re-checked at r38486):
 | U-Boot env in preinit | cosmetic, upstream: preinit prints `Cannot parse config file '/etc/fw_env.config'` and `Failed to find NVMEM device`. `10_indicate_preinit` runs `board.d` (and so `05_fw_defaults` -> `fw_printenv`) before `82_config_generate` has run `30_uboot-envtools`, and since upstream 220bdab34e `board_detect` reuses that early `/tmp/board.json`, so `owrt_*` env defaults are never applied on first boot on any board that sets up preinit networking from `board.d`. No effect here: the stock env is empty (U-Boot: "bad CRC, using default environment"). Not fixed locally |
 | Wi-Fi MACs from bdinfo | working, same as stock |
 | MLO client (STA) | working on 6 GHz alone, 5 + 6 GHz and 2.4 + 5 + 6 GHz, including reconnects (r38493). With links on both QCN9224 radios every station statistics call used to fail (`not found vif for vdev id 1`, `failed to pull fw stats: -71`, 1 s timeout); fixed by patch 994, which looks the vdev up across the chip |
-| LEDs / buttons | not checked |
+| LEDs / buttons | LEDs working: every LED checked by hand at r38502. Buttons not checked |
 | Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay. The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 | Performance defaults | packet steering on all CPUs (`packet_steering 2`, `steering_flows 128`) and irqbalance enabled on first boot by `uci-defaults/97-cudy-wr11000-defaults`; verified at r38495 |
