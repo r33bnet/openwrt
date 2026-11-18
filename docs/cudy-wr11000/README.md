@@ -135,12 +135,12 @@ through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
 If you do not want to build, `docs/cudy-wr11000/` has the two images that
 were installed and tested in Status, built from this branch at
-`r38488-e02ab4204b` (2026-11-17):
+`r38493-d72c090d08` (2026-11-17):
 
 | File | Use | Built from | SHA-256 |
 |---|---|---|---|
-| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `8311a1a9e380fe0ea24cf16943113031cadb127d8e45676fb613b9648fe2995c` |
-| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `e4addd98b1e694ea260b4ffb94666b6b5c5d8885474beba8cdf62e029aa43105` |
+| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `8a6d657c8a90b6466df66ff29a6927a7496030a50246fffc9adfa8ef3fc872a1` |
+| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `192f89014c3239a3a097969d6a92bbf58b3f23755f54f0df46ebd931ed9c631a` |
 
 Check them first (`sha256sum wr11000_*`), then follow
 [First boot](#first-boot-ram-only-nothing-written),
@@ -299,7 +299,7 @@ re-checked at r38486):
 | Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US). Re-checked at r38486: channel 100 / EHT160 ran its 60 s CAC and came up |
 | U-Boot env in preinit | cosmetic, upstream: preinit prints `Cannot parse config file '/etc/fw_env.config'` and `Failed to find NVMEM device`. `10_indicate_preinit` runs `board.d` (and so `05_fw_defaults` -> `fw_printenv`) before `82_config_generate` has run `30_uboot-envtools`, and since upstream 220bdab34e `board_detect` reuses that early `/tmp/board.json`, so `owrt_*` env defaults are never applied on first boot on any board that sets up preinit networking from `board.d`. No effect here: the stock env is empty (U-Boot: "bad CRC, using default environment"). Not fixed locally |
 | Wi-Fi MACs from bdinfo | working, same as stock |
-| MLO client (STA) | associates and working. With links on both QCN9224 radios (5 + 6 GHz) every station statistics call used to fail (`not found vif for vdev id 1`, `failed to pull fw stats: -71`, 1 s timeout), about once a second; single-link was clean. Patch 994 looks the vdev up across the chip and skips entries it cannot match (not yet tested) |
+| MLO client (STA) | working on 6 GHz alone, 5 + 6 GHz and 2.4 + 5 + 6 GHz, including reconnects (r38493). With links on both QCN9224 radios every station statistics call used to fail (`not found vif for vdev id 1`, `failed to pull fw stats: -71`, 1 s timeout); fixed by patch 994, which looks the vdev up across the chip |
 | LEDs / buttons | not checked |
 | Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay. The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
