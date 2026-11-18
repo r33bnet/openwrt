@@ -1,0 +1,35 @@
+From: OpenWrt WR11000 port
+Subject: [PATCH] wifi: ath12k: select the AHB memory mode like PCI
+
+ath12k_wifi7_ahb_probe() hard-codes ATH12K_QMI_MEMORY_MODE_DEFAULT, so
+the integrated IPQ5332 radio always gets the profile meant for 1 GiB+
+systems: 32768 TX descriptors per pool and TX completion entries, 12288
+RX descriptors and 4096/8092-entry monitor rings that are filled with
+buffers at start-up. PCI devices already go through
+ath12k_core_get_memory_mode(), which picks LOW_512_M below 512 MiB of
+RAM and, with 313-ath12k-allow-dt-memory-mode-override.patch, honours
+"qcom,ath12k-fw-memory-mode" from DT.
+
+Use the same helper for AHB. On the Cudy WR11000 (512 MiB, 368 MiB for
+Linux) the QCN9224 already ran LOW_512_M while the IPQ5332 ran DEFAULT.
+Stock firmware runs the IPQ5332 in its 512M profile too ([512M] in
+QCA5332_i.ini: 9 vdevs, 128 peers, smaller descriptor pools), which
+matches LOW_512_M.
+
+Boards with 512 MiB or more and no DT property keep the default mode.
+
+---
+--- a/drivers/net/wireless/ath/ath12k/wifi7/ahb.c
++++ b/drivers/net/wireless/ath/ath12k/wifi7/ahb.c
+@@ -51,7 +51,10 @@
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+-	ab->target_mem_mode = ATH12K_QMI_MEMORY_MODE_DEFAULT;
++	/* As for PCI: honour qcom,ath12k-fw-memory-mode, else pick the
++	 * low-memory profile on systems with less than 512 MiB of RAM.
++	 */
++	ab->target_mem_mode = ath12k_core_get_memory_mode(ab);
+ 	ab->hw_rev = hw_rev;
+ 
+ 	ret = ath12k_wifi7_hw_init(ab);

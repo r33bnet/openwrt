@@ -107,14 +107,15 @@
 		};
 
 		/*
-		 * QCN9224 host DDR. The vendor 512 MiB profile gives each
-		 * QCN9224 37 MiB; the GL-BE9300/BE6500 ports give it 50 MiB and
-		 * are known to work with the in-tree ath12k firmware, so use
-		 * their size at the vendor's first WKK slot. If memory gets
-		 * tight this can be tried at 0x02500000.
+		 * QCN9224 host DDR, at the vendor's first WKK slot with the
+		 * vendor 512 MiB profile's size, 37 MiB. The GL-BE9300/BE6500
+		 * ports use 50 MiB, but they have 1 GiB of RAM. The in-tree
+		 * firmware uses 32.3 MiB here in memory mode 1 ("using fixed
+		 * PCI host DDR ... used 33857536"); a request that does not
+		 * fit fails loudly ("exceeds host DDR size").
 		 */
 		qcn9274_host_ddr: qcn9274-host-ddr@4ed00000 {
-			reg = <0x0 0x4ed00000 0x0 0x03200000>;
+			reg = <0x0 0x4ed00000 0x0 0x02500000>;
 			no-map;
 		};
 	};
@@ -719,6 +720,10 @@
 	memory-region-names = "q6-region", "host-ddr-mem", "m3-dump", "q6-caldb",
 			      "mlo-global-mem", "q6-etr-dump";
 	qcom,board-id = <0x16>;
+	/* Low-memory profile, as stock runs this chip ([512M] in
+	 * QCA5332_i.ini) and as the QCN9224 does. Needs patch 993: upstream
+	 * ahb.c hard-codes the default mode. */
+	qcom,ath12k-fw-memory-mode = <1>;
 	qcom,rproc = <&q6v5_wcss>;
 	/* 2.4 GHz radio = bdinfo base, as on stock. Also becomes the
 	 * MLO wiphy address (radio 0). */
