@@ -111,7 +111,9 @@ Both radios run ath12k's low-memory profile (`qcom,ath12k-fw-memory-mode =
 profile for the integrated radio; patch 993 makes it follow the DT property
 like PCI does. The sysupgrade config also adds `zram-swap`. Before these
 changes Linux had 368 MiB and about 26 MiB available after 2 h with three
-APs and an MLO client.
+APs and an MLO client; at r38491 it has 381 MiB, and 30 min into the same
+test about 100 MiB free and 115 MiB available, with the 190 MiB zram swap
+still unused.
 
 **Wi-Fi.**
 
@@ -297,7 +299,7 @@ re-checked at r38486):
 | Wi-Fi 2.4 / 5 / 6 GHz, MLO AP | working, 5 GHz DFS at 160 MHz, 6 GHz at 320 MHz (country US). Re-checked at r38486: channel 100 / EHT160 ran its 60 s CAC and came up |
 | U-Boot env in preinit | cosmetic, upstream: preinit prints `Cannot parse config file '/etc/fw_env.config'` and `Failed to find NVMEM device`. `10_indicate_preinit` runs `board.d` (and so `05_fw_defaults` -> `fw_printenv`) before `82_config_generate` has run `30_uboot-envtools`, and since upstream 220bdab34e `board_detect` reuses that early `/tmp/board.json`, so `owrt_*` env defaults are never applied on first boot on any board that sets up preinit networking from `board.d`. No effect here: the stock env is empty (U-Boot: "bad CRC, using default environment"). Not fixed locally |
 | Wi-Fi MACs from bdinfo | working, same as stock |
-| MLO client (STA) | associates and working |
+| MLO client (STA) | associates and working. With links on both QCN9224 radios (5 + 6 GHz) every station statistics call used to fail (`not found vif for vdev id 1`, `failed to pull fw stats: -71`, 1 s timeout), about once a second; single-link was clean. Patch 994 looks the vdev up across the chip and skips entries it cannot match (not yet tested) |
 | LEDs / buttons | not checked |
 | Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay. The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
@@ -323,6 +325,7 @@ target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/ieee80211/41-cudy-wr110
 package/kernel/mac80211/patches/ath12k/991-wifi-ath12k-track-country-sent-to-firmware.patch   new
 package/kernel/mac80211/patches/ath12k/992-wifi-ath12k-keep-regd-on-reg-event-without-rules.patch   new
 package/kernel/mac80211/patches/ath12k/993-wifi-ath12k-select-AHB-memory-mode-like-PCI.patch   new
+package/kernel/mac80211/patches/ath12k/994-wifi-ath12k-skip-rssi-chain-stats-for-unknown-vdevs.patch   new
 target/linux/qualcommbe/ipq53xx/base-files/lib/upgrade/platform.sh     (BE6500 helper renamed remove_oem_ubi_rootfs)
 package/boot/uboot-tools/uboot-envtools/files/qualcommbe_ipq53xx
 package/firmware/ipq-wifi/Makefile, src/board-cudy_wr11000.{ipq5332,qcn9274}
