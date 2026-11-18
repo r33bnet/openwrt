@@ -99,9 +99,19 @@ names the squashfs volume `rootfs` (not `ubi_rootfs`), so the DTS appends
 
 **Memory.** Uses the vendor 512 MiB profile: Q6 35 MiB at `0x4a900000`, then
 m3-dump, ETR, caldb, MLO at `0x4db00000`, and no `tzapp`. The QCN9224 host
-region uses the 50 MiB the GL ports run with. The vendor gives it 37 MiB; try
-`0x02500000` if RAM is tight. ramoops sits in the gap at `0x4da00000`, so a
-crash log survives a reboot.
+region is the vendor's 37 MiB (`0x02500000`); the firmware uses 32.3 MiB of
+it ("using fixed PCI host DDR ... used 33857536"). The GL ports give it
+50 MiB, but they have 1 GiB of RAM. ramoops sits in the gap at `0x4da00000`,
+so a crash log survives a reboot.
+
+Both radios run ath12k's low-memory profile (`qcom,ath12k-fw-memory-mode =
+<1>`, `LOW_512_M`): half the TX/RX descriptors, small monitor rings, at most
+9 vdevs and 128 clients per chip - the same limits stock firmware uses
+(`[512M]` in `QCA5332_i.ini`). Upstream ath12k hard-codes the default
+profile for the integrated radio; patch 993 makes it follow the DT property
+like PCI does. The sysupgrade config also adds `zram-swap`. Before these
+changes Linux had 368 MiB and about 26 MiB available after 2 h with three
+APs and an MLO client.
 
 **Wi-Fi.**
 
@@ -311,6 +321,8 @@ target/linux/qualcommbe/ipq53xx/base-files/etc/board.d/02_network
 target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/firmware/12-ath12k-caldata
 target/linux/qualcommbe/ipq53xx/base-files/etc/hotplug.d/ieee80211/41-cudy-wr11000-wifi-macs   new
 package/kernel/mac80211/patches/ath12k/991-wifi-ath12k-track-country-sent-to-firmware.patch   new
+package/kernel/mac80211/patches/ath12k/992-wifi-ath12k-keep-regd-on-reg-event-without-rules.patch   new
+package/kernel/mac80211/patches/ath12k/993-wifi-ath12k-select-AHB-memory-mode-like-PCI.patch   new
 target/linux/qualcommbe/ipq53xx/base-files/lib/upgrade/platform.sh     (BE6500 helper renamed remove_oem_ubi_rootfs)
 package/boot/uboot-tools/uboot-envtools/files/qualcommbe_ipq53xx
 package/firmware/ipq-wifi/Makefile, src/board-cudy_wr11000.{ipq5332,qcn9274}
