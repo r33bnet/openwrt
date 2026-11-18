@@ -119,6 +119,23 @@ crash log survives a reboot.
 **MAC addresses.** `bdinfo` `0xde00` is the base. It goes to the conduit
 through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
+## Prebuilt images
+
+If you do not want to build, `docs/cudy-wr11000/` has the two images that
+were installed and tested in Status, built from this branch at
+`r38488-e02ab4204b` (2026-11-17):
+
+| File | Use | Built from | SHA-256 |
+|---|---|---|---|
+| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `8311a1a9e380fe0ea24cf16943113031cadb127d8e45676fb613b9648fe2995c` |
+| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `e4addd98b1e694ea260b4ffb94666b6b5c5d8885474beba8cdf62e029aa43105` |
+
+Check them first (`sha256sum wr11000_*`), then follow
+[First boot](#first-boot-ram-only-nothing-written),
+[Back up](#back-up-before-installing) and [Install](#install) with these
+file names. These are development snapshots for one board, tested on one
+unit; the warning at the top applies.
+
 ## Building
 
 ```sh
@@ -144,11 +161,16 @@ tftpboot 0x50000000 openwrt-qualcommbe-ipq53xx-cudy_wr11000-initramfs-uImage.itb
 bootm 0x50000000
 ```
 
+With the prebuilt image, serve `wr11000_initramfs.itb` instead. It has no
+Wi-Fi: move the cable to a LAN port once it is up, the PC gets a
+`192.168.1.x` lease, and LuCI is at `http://192.168.1.1` (root, no
+password). In the backup steps below `wifi down` then just prints an error.
+
 Load to `0x50000000`, not the usual `0x44000000`. The kernel decompresses to
 `0x42000000` and an initramfs kernel runs past `0x44000000`. Everything from
 `0x4a100000` to `0x4a900000` is U-Boot/TZ/SMEM and must not be touched. Stock
 U-Boot's own defaults are `192.168.1.119` / `192.168.1.88`. U-Boot's TFTP
-works through the port the build calls `wan` (switch port 1; first-boot log).
+works through the port the build calls `wan` (switch port 1).
 
 Stock U-Boot unpacks at most `CONFIG_SYS_BOOTM_LEN` = 64 MiB. With Wi-Fi the
 initramfs must be compressed: *Target Images → ramdisk → Compression → zstd*
@@ -194,6 +216,19 @@ From the initramfs:
 ```sh
 sysupgrade -n /tmp/openwrt-qualcommbe-ipq53xx-cudy_wr11000-squashfs-sysupgrade.bin
 ```
+
+With the prebuilt image, either upload `wr11000_sysupgrade.bin` in LuCI
+(*System → Backup / Flash Firmware → Flash image*, untick *Keep settings*),
+or copy it over and flash it from SSH. The minimal initramfs has no SFTP
+server, so use `scp -O`:
+
+```sh
+scp -O wr11000_sysupgrade.bin root@192.168.1.1:/tmp/
+ssh root@192.168.1.1 sysupgrade -n /tmp/wr11000_sysupgrade.bin
+```
+
+After the reboot it runs from NAND with OpenWrt defaults: LAN
+`192.168.1.1`, root without a password and Wi-Fi off until configured.
 
 `platform.sh` first deletes the stock `ubi_rootfs` volume — otherwise the
 52 MiB UBI is too full for `rootfs_data` — then runs the usual
@@ -254,7 +289,7 @@ re-checked at r38486):
 | Wi-Fi MACs from bdinfo | working, same as stock |
 | MLO client (STA) | associates and working |
 | LEDs / buttons | not checked |
-| Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay (script output in `ps_output_log.txt`). The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
+| Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay. The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
 
 ## Files added or changed for this device
@@ -279,5 +314,5 @@ package/kernel/mac80211/patches/ath12k/991-wifi-ath12k-track-country-sent-to-fir
 target/linux/qualcommbe/ipq53xx/base-files/lib/upgrade/platform.sh     (BE6500 helper renamed remove_oem_ubi_rootfs)
 package/boot/uboot-tools/uboot-envtools/files/qualcommbe_ipq53xx
 package/firmware/ipq-wifi/Makefile, src/board-cudy_wr11000.{ipq5332,qcn9274}
-docs/cudy-wr11000/                                                     this file + backup/restore scripts
+docs/cudy-wr11000/                                                     this file, backup/restore scripts, prebuilt images
 ```
