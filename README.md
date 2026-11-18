@@ -135,12 +135,12 @@ through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
 If you do not want to build, `docs/cudy-wr11000/` has the two images that
 were installed and tested in Status, built from this branch at
-`r38493-d72c090d08` (2026-11-17):
+`r38495-3196e047d2` (2026-11-17):
 
 | File | Use | Built from | SHA-256 |
 |---|---|---|---|
-| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `8a6d657c8a90b6466df66ff29a6927a7496030a50246fffc9adfa8ef3fc872a1` |
-| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `192f89014c3239a3a097969d6a92bbf58b3f23755f54f0df46ebd931ed9c631a` |
+| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `6cc5b898c4a5b9fc9c31633987ad87d13a039a318880071c92ac493688f349bc` |
+| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `dfe542346d16dcea954f7715660d2cccb0757cf4cabb066e25f8df0d79b3365d` |
 
 Check them first (`sha256sum wr11000_*`), then follow
 [First boot](#first-boot-ram-only-nothing-written),
@@ -303,6 +303,7 @@ re-checked at r38486):
 | LEDs / buttons | not checked |
 | Return to stock | working with `wr11000-restore-stock.ps1` (`ubiformat`): VERIFIED, then stock attaches with no ECC errors and mounts its overlay. The `.sh` version is not tested yet. The old `mtd write` restore corrupted the UBI (see Install) |
 | PPE flow offload | **not expected to work**: this tree's offload patches parse the `rtl8_4` DSA tag, not QCA's 2-byte header |
+| Performance defaults | packet steering on all CPUs (`packet_steering 2`, `steering_flows 128`) and irqbalance enabled on first boot by `uci-defaults/97-cudy-wr11000-defaults`; verified at r38495 |
 
 ## Files added or changed for this device
 
