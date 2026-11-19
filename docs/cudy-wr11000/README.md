@@ -26,7 +26,7 @@ install, UBI attach without ECC errors, all three radios and an MLO client.
 
 | Block | Detail | Source |
 |---|---|---|
-| SoC | Qualcomm **IPQ5322** (IPQ5332 family), 4× Cortex-A53 | boot log `CPU: IPQ5322` |
+| SoC | Qualcomm **IPQ5322** (IPQ5332 family), 4× Cortex-A53, 1.1 / 1.5 GHz (cpufreq, `schedutil`). The boot log line `changing to: 1100000 kHz` is only the starting speed; it reaches 1.5 GHz under load | boot log `CPU: IPQ5322`, `scaling_available_frequencies` |
 | RAM | 512 MiB DDR4 | U-Boot `DRAM: 512 MiB` |
 | Flash | 128 MiB SPI-NAND, GigaDevice GD5F1GM7REYIG, on QPIC | U-Boot / kernel log |
 | Reference design | AP-MI01.6, machid `0x8060000`, Cudy board "R65" | `model = .../AP-MI01.6/R65` |
