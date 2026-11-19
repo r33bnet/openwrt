@@ -18,8 +18,9 @@ listed in those commit messages. On this base (2026-11-16): builds, TFTP
 boot, NAND install and a cold NAND boot work, with the switch and both Wi-Fi
 chips up (after patch 0467, open item 11). Other results below were first
 obtained on Linux 6.18.39. Since then main is merged in rather than rebased
-onto; the last merge is main of 2026-11-18 (`2ccaccdb98`, still Linux
-6.18.60), built and re-tested as r38502.
+onto; the last merge is main of 2026-11-19 (`6354b1ffc6`, Linux 6.18.64,
+GCC 15.3.0 as the default toolchain), built and re-tested as r38519: NAND
+install, UBI attach without ECC errors, all three radios and an MLO client.
 
 ## Hardware
 
@@ -137,12 +138,12 @@ through nvmem; LAN uses the base and WAN uses base + 1 (`board.d/02_network`).
 
 If you do not want to build, `docs/cudy-wr11000/` has the two images that
 were installed and tested in Status, built from this branch at
-`r38502-e58fc0f8ae` (2026-11-18):
+`r38519-13424e1025` (2026-11-19):
 
 | File | Use | Built from | SHA-256 |
 |---|---|---|---|
-| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `eea6256e1948a5c73a1fc55f7b7f53bfa0b745e884418a5c5fa42e8d74537566` |
-| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI | `configs/cudy-wr11000-sysupgrade.config` | `514e3fd1311c9c71948d9c0ed6b2e08869297cd7766570c502ea02ebe2edb146` |
+| `wr11000_initramfs.itb` | TFTP RAM boot, writes nothing. LAN with DHCP, SSH and LuCI over HTTP to flash the sysupgrade; **no Wi-Fi** | `configs/cudy-wr11000-initramfs.config` | `ceb86092362e5278a76199db685311f80c33a194eb269271077861e4007e6191` |
+| `wr11000_sysupgrade.bin` | NAND install: full image with Wi-Fi and LuCI, plus irqbalance, zram swap and the `btop`, `bmon`, `iftop` and `speedtestcpp` tools | `configs/cudy-wr11000-sysupgrade.config` | `f0515297196c562af8367ffd36b2f3d5b25022fb574636f2d3feac92707de766` |
 
 Check them first (`sha256sum wr11000_*`), then follow
 [First boot](#first-boot-ram-only-nothing-written),
@@ -157,6 +158,16 @@ unit; the warning at the top applies.
 make menuconfig   # Qualcomm Atheros 802.11be → ipq53xx → Cudy WR11000
 make -j$(nproc)
 ```
+
+To build the prebuilt images instead, start from a saved config:
+`cp configs/cudy-wr11000-sysupgrade.config .config && make defconfig` (or
+`cudy-wr11000-initramfs.config`).
+
+After a toolchain change, such as a merge that moves the default GCC, run
+`make clean` before building. `build_dir/target-*` is not versioned by
+compiler, so CMake packages keep their old `CMakeCache.txt`. After the GCC 15
+merge, ucode and procd then found the host libubox instead of the target
+one and failed with `-Werror` on `uloop_timeout_remaining` being deprecated.
 
 Output in `bin/targets/qualcommbe/ipq53xx/`:
 
